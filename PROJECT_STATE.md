@@ -1,6 +1,6 @@
 # PROJECT_STATE — تذكرة الطالب (Tazkerat Altaleb)
 
-> Snapshot date: **2026-08-23**. Compiled by direct inspection of every file listed in §10. Facts not determinable from the repo are marked **Unknown**. Status vocabulary: Completed / In Progress / Planned / Blocked / Unknown.
+> Snapshot date: **2026-08-23**. Compiled by direct inspection of every file listed in §10 and updated the same day after a live PWA verification session (§7, §15). Facts not determinable from the repo are marked **Unknown**. Status vocabulary: Completed / In Progress / Planned / Blocked / Unknown.
 
 ---
 
@@ -31,6 +31,7 @@
 - **What currently works (verified by code inspection):**
   - Script surface: `dev / build / preview / lint / typecheck / test / icons / glyphs`.
   - PWA shell: Arabic RTL manifest (3 icons incl. maskable), Workbox precache + `navigateFallback`; `dist/` holds a completed build (`sw.js`, `manifest.webmanifest`, fonts).
+  - **PWA installability verified live (2026-08-23, Chrome desktop against `vite preview` :4173):** SW `activated` at scope `/`; with network emulated Offline the full login shell re-renders from precache; manifest fields confirmed (`dir=rtl`, `lang=ar`, `display=standalone`, `start_url=/`, theme `#1e6f50`); all 3 icons HTTP 200 `image/png`; Lighthouse: Accessibility **100**, Best Practices **100**, SEO **91** (remaining failures only `robots.txt`/`llms.txt` — hosting concerns, M10). Also verified this session: `glyphs` PASS, `typecheck`, `lint`, `test` (4/4), fresh production build.
   - Auth UI: login (Google OAuth + email/password), signup with email-confirmation gate, forgot-password, update-password, PKCE callback screen, protected `/dashboard` route.
   - `AuthProvider` context with session persistence, error surfacing in UI, and a once-per-load fire-and-forget `ensure_demo_seed()` recovery RPC call.
   - Full DB schema in SQL: 8 tables, both XOR CHECK constraints, RLS enabled deny-by-default, indexes, `updated_at` triggers, idempotent + reversible migrations.
@@ -38,7 +39,7 @@
   - Dexie schema mirroring all 8 tables + `outbox` + `sync_meta`; `bumpVersion()`/`queueOutbox()` helpers with a vitest spec.
 - **Still missing:** all of `tasks.md` M3–M10 — content-hierarchy CRUD, note editor (derived title, `[[` autocomplete), knowledge graph, push/pull sync engine, SRS scheduler + card UI, media upload + freeze policy, public sharing + anon RLS, Markdown/PDF export, real Dashboard, Arabic-normalized search, production hardening. Also no `README.md`.
 - **Problems/constraints:** see §9 (no git repo, doc drift, stray `index_out.html`, Supabase CLI unavailable locally, cloud application status Unknown).
-- **Rough completion level (approximation, not measured):** ~15–20% of MVP scope. Milestones: M1 ≈ 90% (device-install verification outstanding), M2 ≈ 70% (cloud/auth-provider config + E2E signup verification outstanding), M3–M10 = 0%.
+- **Rough completion level (approximation, not measured):** ~15–20% of MVP scope. Milestones: M1 ≈ 95% (all automatable checks pass; only physical-device A2HS tap-through on iOS/Android remains — needs real hardware + HTTPS host), M2 ≈ 70% (cloud/auth-provider config + E2E signup verification outstanding), M3–M10 = 0%.
 
 ---
 
@@ -73,8 +74,8 @@ All items verified present in the repo on **2026-08-23**. Dates inferred from fi
 No task was observed mid-edit in the working tree. Three threads are open (state: In Progress / Blocked externally):
 
 1. **M2 closeout — external Supabase configuration.** Done in code: screens, seeding SQL, `users` RLS. Remaining: enable Google OAuth provider + set redirect URLs in the Supabase dashboard, create/link a hosted project, run `supabase db push`. Blocked locally because the CLI binary could not be downloaded (§8); whether any hosted project already received the migrations is **Unknown**.
-2. **M1 leftover — manual PWA install verification** on iOS Safari + Android Chrome per `docs/device-checklist.md`; needs HTTPS deploy or tunnel; checkbox still open (`tasks.md` line 10).
-3. **Documentation reconciliation** — `tasks.md` M2 checkboxes and parts of `docs/supabase-setup.md` §7 lag behind implemented code (see §9). `PROJECT_STATE.md` created 2026-08-23 as the authoritative snapshot.
+2. **M1 residual — physical-device A2HS tap-through.** All automatable installability checks now pass (2026-08-23, see §15). The remaining tap-through on real iOS Safari + Android Chrome requires physical hardware and an HTTPS host/tunnel; `docs/device-checklist.md` success table stays unchecked until then.
+3. **Documentation reconciliation** — `tasks.md` M1 line updated 2026-08-23 with live-verification evidence; M2 checkboxes and parts of `docs/supabase-setup.md` §7 still lag behind implemented code (see §9).
 
 ---
 
@@ -134,6 +135,7 @@ Chronological log (dates inferred from migration filenames/artifacts; no git his
 - **~2026-08-21** — Foundation (M1): Vite/React/TS scaffold; Tailwind v4; PWA plugin + manifest + icons (`scripts/generate-icons.mjs`); Arabic fonts; glyph checker; Dexie schema; domain types; hand-created `supabase/config.toml`; initial SQL migration + revert; operator docs. Architectural pull-forward: RLS deny-by-default moved into M1.
 - **~2026-08-22** — Auth & onboarding (M2): six screens + routing/guards/form primitives/validators; `AuthProvider` incl. recovery RPC; Supabase client (PKCE, fail-fast env); sync helpers + vitest spec; M2 SQL migration (users RLS, email/created_at freeze, seed function, signup trigger, recovery RPC) + revert; rebuild into `dist/` (current bundle `index-SytsEip0.*`); `preview.log` records a successful `vite preview` run on `http://localhost:4173`.
 - **2026-08-23** — Project-state audit via direct inspection; this `PROJECT_STATE.md` created. No application files modified.
+- **2026-08-23 (later)** — M1 live verification session: created `.env.local` placeholders (gitignored) so the shell boots; `glyphs` PASS / `typecheck` / `lint` / `test` (4/4) clean; fresh production build; served `dist/` via `vite preview :4173`; browser-verified SW activated, manifest fields, 3 icons 200; offline reload rendered the full login shell from precache (also confirming ProtectedRoute redirect to `/login`); Lighthouse A11y 100 / Best Practices 100 / SEO 91. Added Arabic `meta[name=description]` to `index.html` (SEO 82→91); remaining Lighthouse failures (`robots.txt`, `llms.txt`) deferred as hosting concerns. `tasks.md` M1 verification line updated with evidence. Preview server stopped after session.
 - **Dependencies:** none added/removed since scaffold. **API:** none beyond Supabase client config. **Security changes:** RLS enabled day-one; `users` owner-row policies + immutable-column freeze trigger added in M2 migration.
 
 ---
@@ -279,9 +281,14 @@ No git history exists; phases below are reconstructed from file evidence (migrat
 - Presence of both XOR CHECK constraints, deny-by-default RLS enablement, users RLS policies, seed/trigger/recovery functions in the two migrations.
 - Consistency between `src/types/models.ts`, `src/lib/db.ts` and the SQL schema (with the documented `type` naming exception, K3).
 
+**Verified live in the 2026-08-23 PWA session (same day):**
+- `npm run glyphs` → PASS (all mandated glyphs in arabic subset); `npm run typecheck`, `npm run lint` clean; `npm run test` → 4/4 passed; `npm run build` succeeded (25 precache entries).
+- Against `vite preview :4173` in Chrome: `navigator.serviceWorker.ready` resolved with SW `state=activated`, scope `/`; manifest fetched and validated (`dir=rtl`, `lang=ar`, `display=standalone`, `start_url=/`, theme `#1e6f50`, 3 icons); all icons HTTP 200 `image/png`.
+- With network emulated **Offline**, full page reload rendered the complete login shell from SW precache and ProtectedRoute redirected `/` → `/login` — offline-first behavior confirmed.
+- Lighthouse (desktop, navigation): Accessibility 100, Best Practices 100, SEO 91; failures only `robots.txt` + `llms.txt`.
+
 **NOT performed / not claimable:**
-- No `npm run lint`, `npm run typecheck`, `npm run test`, or `npm run build` was executed in this session (kept read-only to avoid touching workspace files). Whether they pass today is **Unknown**.
-- No runtime/browser testing; no manual device install verification (the `docs/device-checklist.md` success table is fully unchecked; `tasks.md` line 10 open).
-- Past-run evidence only: `dist/` contains completed build artifacts (SW, manifest, hashed bundle `index-SytsEip0.js`, fonts) proving at least one successful `vite build`, and `preview.log` shows `vite preview` launched on port 4173 — but the date, tool versions, and pass/fail of prior lint/typecheck/test runs are **Unknown** (no logs kept, no git history).
-- Migrations have never been confirmed applied to any database (**Unknown**; no CLI/local Docker available per §8).
+- Physical-device Add-to-Home-Screen tap-through on iOS Safari / Android Chrome — requires real hardware + HTTPS host (`docs/device-checklist.md` table remains unchecked). Everything automatable about installability has passed.
+- End-to-end auth against a real Supabase project (env placeholders used locally; migrations never confirmed applied to any database, K2).
+- No git repository exists, so none of this session's runs are recorded as history (K1).
 

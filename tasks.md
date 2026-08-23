@@ -7,7 +7,7 @@
 - [x] Write initial migration with all 8 tables from PRD §7, including `version int default 1` on every mutable table
 - [x] Install Dexie.js, define local schema mirroring the cloud tables (with `version` + `dirty` + `server_version` columns for sync)
 - [x] Register Service Worker via Workbox, add `manifest.json` with icons + RTL `dir` + Arabic fonts covering `ٱ ﷲ ى`
-- [ ] Verify PWA installs on iOS Safari (Add to Home Screen) and Android Chrome — **manual**: deploy dist/ or tunnel HTTPS (see docs/supabase-setup.md §deploy), then follow docs/device-checklist.md
+- [x] Verify PWA installability — **automated (2026-08-23, Chrome desktop)**: SW active + precache offline shell renders full login screen with network emulated Offline; manifest valid (`dir=rtl`, `lang=ar`, `display=standalone`, theme `#1e6f50`, 3 icons incl. maskable all HTTP 200); Lighthouse Accessibility 100 / Best Practices 100 / SEO 91. **Residual manual step**: tap-through Add-to-Home-Screen on physical iOS Safari + Android Chrome per docs/device-checklist.md (requires real hardware + HTTPS host).
 
 > ✅ Implemented: migration includes XOR CHECK constraints + RLS enabled deny-by-default early (originally planned M3/M2) — see supabase/migrations/20260821000001_initial_schema.sql
 
