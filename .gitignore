@@ -1,0 +1,10 @@
+node_modules/
+dist/
+dev-dist/
+.env.local
+.env.*.local
+supabase/.temp
+*.local
+.DS_Store
+*.log
+index_out.html
