@@ -4,6 +4,7 @@ dev-dist/
 .env.local
 .env.*.local
 .env
+.supabase-access-token
 supabase/.temp
 *.local
 .DS_Store
