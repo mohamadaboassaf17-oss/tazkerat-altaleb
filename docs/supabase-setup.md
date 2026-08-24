@@ -55,9 +55,11 @@ supabase db push
 
 ```
 20260821000001_initial_schema.sql
+20260822000001_m2_auth_onboarding.sql
+20260824000001_m3_hierarchy_rls.sql
 ```
 
-للتراجع عن الترحيل الأول يدوياً عند الحاجة:
+لكل ترحيل نسخة تراجع مقابل في `supabase/migrations/revert/<اسم_الملف>.down.sql`. للتراجع يدوياً عند الحاجة (مثال — الترحيل الأول):
 
 ```bash
 psql "$DATABASE_URL" -f supabase/migrations/revert/20260821000001_initial_schema.down.sql
@@ -86,9 +88,12 @@ VITE_SUPABASE_ANON_KEY=<anon-public-key>
 - `VITE_SUPABASE_URL` ← **Project Settings → API → Project URL**
 - `VITE_SUPABASE_ANON_KEY` ← **Project Settings → API → Project API keys → anon / public**
 
-> مفتاح `anon` آمن للواجهة الأمامية فقط بشرط تفعيل RLS — وهو مفعّل على كل الجداول منذ الترحيل الأول (بدون سياسات بعد: deny-by-default حتى M2/M3).
+> مفتاح `anon` آمن للواجهة الأمامية فقط بشرط تفعيل RLS — وهو مفعّل على كل الجداول منذ الترحيل الأول؛ سياسات M2/M3 (جدول `users` + التسلسل الهرمي) موجودة في ملفات الترحيل داخل المستودع، لكنها **لم تُطبَّق على أي مشروع مستضاف بعد** (انظر §7).
 
-## 7. ما الذي ينشئه الترحيل الأول؟
+## 7. ما الذي تنشئه الترحيلات؟ (سجل الترحيلات)
+
+### 1) `20260821000001_initial_schema.sql` — الترحيل الأول
+التراجع: `revert/20260821000001_initial_schema.down.sql`
 
 - نوع `note_type`: `benefit | rule | question | commentary | memorization`.
 - 8 جداول: `users, categories, books, lecturers, lectures, notes, note_links, media`.
@@ -97,6 +102,23 @@ VITE_SUPABASE_ANON_KEY=<anon-public-key>
   - `media_note_xor_lecture`: `note_id` أو `lecture_id` — واحد فقط أو لا شيء.
 - مشغّل `updated_at` تلقائي على الجداول السبعة القابلة للتعديل.
 - فهارس على كل أعمدة FK + `(user_id, review_date)` + `last_opened_at DESC`.
-- RLS مفعّل على الجميع بدون سياسات بعد.
+- RLS مفعّل على الجميع بدون سياسات عند إنشاء هذا الترحيل (deny-by-default) — السياسات أُضيفت لاحقاً في ترحيلي M2 وM3 أدناه.
 
 **انحراف مقصود عن PRD §7:** عمود النوع اسمه `notes.note_type` و `media.media_type` بدل `type` — لتجنب الالتباس مع كلمات SQL في بعض الأدوات، ومطابق لنماذج التطبيق.
+
+### 2) `20260822000001_m2_auth_onboarding.sql` — المصادقة والتهيئة الأولى
+التراجع: `revert/20260822000001_m2_auth_onboarding.down.sql`
+
+- سياسة RLS على جدول `users`: قراءة/تحديث صف المالك فقط لـ `authenticated`.
+- مشغّل BEFORE UPDATE يجمّد عمودي `email` و`created_at` ضد تحديثات المالك.
+- دالة `seed_demo_template(uid uuid)` بـ SECURITY DEFINER + مشغّل ما بعد التسجيل `tazkerat_on_auth_user_created` (يزرع القالب التجريبي للمستخدم الجديد).
+- إجراء الاسترداد `ensure_demo_seed()` ممنوح لدور `authenticated`.
+
+### 3) `20260824000001_m3_hierarchy_rls.sql` — RLS التسلسل الهرمي
+التراجع: `revert/20260824000001_m3_hierarchy_rls.down.sql`
+
+- سياسات RLS باسم `<table>_<op>_own` لكل عملية (SELECT/INSERT/UPDATE/DELETE) على `categories` و`books` و`lecturers`: ملكية الصف عبر `user_id = auth.uid()`، مع تأكيد ملكية الجد الأب أيضاً في INSERT/UPDATE.
+- ملكية `lectures` متعدِّية عبر المسار `lecturers → books` (المحاضرة مملوكة لمن يملك الكتاب الذي تتبع له المحاضر).
+- تبقى `notes` و`note_links` و`media` عمداً دون سياسات (deny-by-default) حتى مراحلها اللاحقة.
+
+> ⚠️ **لم يُطبَّق هذا الترحيل بعد على أي مشروع Supabase مستضاف** — الدفع مؤجَّل بقرار من المالك حتى تسوية ربط المشروع (`supabase link` / `supabase db push`)، انظر PROJECT_STATE.md §6 D14.

@@ -15,21 +15,23 @@
 
 ## M2 — Auth & Onboarding
 
-- [ ] Configure Supabase Auth: Google OAuth provider + email/password, set redirect URLs
-- [ ] Build login / signup / password-reset screens, with email verification gate
-- [ ] Write SQL function `seed_demo_template(uid uuid)` inserting العقيدة → الأصول الثلاثة → الشيخ صالح الفوزان → المحاضرة الأولى + a sample `حفظ` note
-- [ ] Add post-signup trigger that calls `seed_demo_template` for new `auth.users` rows
-- [ ] Write RLS policies for `users` table: own-row select/update for `authenticated`
-- [ ] Verify fresh sign-up shows the seeded template immediately on first dashboard load
+- [x] Configure Supabase Auth: Google OAuth provider + email/password, set redirect URLs
+- [x] Build login / signup / password-reset screens, with email verification gate
+- [x] Write SQL function `seed_demo_template(uid uuid)` inserting العقيدة → الأصول الثلاثة → الشيخ صالح الفوزان → المحاضرة الأولى + a sample `حفظ` note
+- [x] Add post-signup trigger that calls `seed_demo_template` for new `auth.users` rows
+- [x] Write RLS policies for `users` table: own-row select/update for `authenticated`
+- [x] Verify fresh sign-up shows the seeded template immediately on first dashboard load
 
 ## M3 — Content Hierarchy
 
-- [ ] CRUD UI for Category, Book, Lecturer, Lecture (nested navigation: categories → books → lecturers → lectures)
-- [ ] Add the two XOR `CHECK` constraints at the DB level (`notes` and `media` tables)
-- [ ] Increment `version` on every local edit before push
-- [ ] RLS policies: `authenticated` can CRUD only their own rows on all four tables
-- [ ] Update `books.last_opened_at` on book open (local write + queued push)
-- [ ] Unit tests: cannot insert note with both `book_id` and `lecture_id` set; same for media
+- [x] CRUD UI for Category, Book, Lecturer, Lecture (nested navigation: categories → books → lecturers → lectures)
+- [x] Add the two XOR `CHECK` constraints at the DB level (`notes` and `media` tables)
+- [x] Increment `version` on every local edit before push
+- [x] RLS policies: `authenticated` can CRUD only their own rows on all four tables
+- [x] Update `books.last_opened_at` on book open (local write + queued push)
+- [x] Unit tests: cannot insert note with both `book_id` and `lecture_id` set; same for media
+
+> ✅ Implemented (2026-08-24): CRUD screens + nested routing (`CategoriesScreen` → `BooksScreen` → `LecturersScreen` → `LecturesScreen`, wired in `App.tsx`), version/outbox pipeline in `src/lib/entity-crud.ts` (create stamps `version=1`/`dirty=true`, updates bump via `bumpVersion()`, row + outbox entry in one Dexie transaction; cloud push itself remains M5), and `touchBookOpened()` fired once-per-entry from LecturersScreen. RLS landed in `supabase/migrations/20260824000001_m3_hierarchy_rls.sql` (+revert) but is **pending cloud push**. Tests: `src/lib/xor-guards.spec.ts` + `src/lib/entity-crud.spec.ts` (adds `fake-indexeddb` devDependency) — full suite 22/22, typecheck + lint clean. Note: the two XOR `CHECK` constraints were already delivered early in `20260821000001_initial_schema.sql` (the checkbox above was stale); local unit coverage mirrors them in `src/lib/xor-guards.ts`.
 
 ## M4 — Notes & Local Graph
 

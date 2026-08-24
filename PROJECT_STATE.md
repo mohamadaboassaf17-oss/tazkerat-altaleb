@@ -1,6 +1,6 @@
 # PROJECT_STATE — تذكرة الطالب (Tazkerat Altaleb)
 
-> Snapshot date: **2026-08-23**. Compiled by direct inspection of every file listed in §10 and updated the same day after a live PWA verification session (§7, §15). Facts not determinable from the repo are marked **Unknown**. Status vocabulary: Completed / In Progress / Planned / Blocked / Unknown.
+> Snapshot date: **2026-08-24**. Compiled by direct inspection of every file listed in §10 and updated after the live PWA verification session (2026-08-23, §15) and again after the M3 closeout session of 2026-08-24 (§7, §13). Facts not determinable from the repo are marked **Unknown**. Status vocabulary: Completed / In Progress / Planned / Blocked / Unknown.
 
 ---
 
@@ -10,7 +10,7 @@
 
 **Goal:** one place for progress tracking + smart notes + knowledge map + scheduled review, fully usable offline (PRD §1, §9).
 
-**Current status:** early scaffolding phase. Milestones M1 (foundation/PWA shell/DB schema) and most of M2 (auth UI + onboarding SQL) exist as real code; all product features remain Planned.
+**Current status:** local-first build-out phase. Milestones M1 (foundation/PWA shell/DB schema) ≈95%, most of M2 (auth UI + onboarding SQL) ≈70%, and M3 (content-hierarchy CRUD, version/outbox mutation pipeline, hierarchy RLS written in-repo but not yet pushed to cloud) exist as real code; sync/SRS/media/sharing/dashboard features remain Planned.
 
 **Core tech stack (hard, per AGENTS.md):**
 
@@ -37,15 +37,15 @@
   - Full DB schema in SQL: 8 tables, both XOR CHECK constraints, RLS enabled deny-by-default, indexes, `updated_at` triggers, idempotent + reversible migrations.
   - Server-side demo-template seeding (`seed_demo_template()` + post-signup trigger + recovery RPC).
   - Dexie schema mirroring all 8 tables + `outbox` + `sync_meta`; `bumpVersion()`/`queueOutbox()` helpers with a vitest spec.
-- **Still missing:** all of `tasks.md` M3–M10 — content-hierarchy CRUD, note editor (derived title, `[[` autocomplete), knowledge graph, push/pull sync engine, SRS scheduler + card UI, media upload + freeze policy, public sharing + anon RLS, Markdown/PDF export, real Dashboard, Arabic-normalized search, production hardening. Also no `README.md`.
-- **Problems/constraints:** see §9 (no git repo, doc drift, stray `index_out.html`, Supabase CLI unavailable locally, cloud application status Unknown).
-- **Rough completion level (approximation, not measured):** ~15–20% of MVP scope. Milestones: M1 ≈ 95% (all automatable checks pass; only physical-device A2HS tap-through on iOS/Android remains — needs real hardware + HTTPS host), M2 ≈ 70% (cloud/auth-provider config + E2E signup verification outstanding), M3–M10 = 0%.
+- **Still missing:** all of `tasks.md` M4–M10 — note editor (derived title, `[[` autocomplete), knowledge graph, push/pull sync engine, SRS scheduler + card UI, media upload + freeze policy, public sharing + anon RLS, Markdown/PDF export, real Dashboard, Arabic-normalized search, production hardening. Also no `README.md`, and none of the M1–M3 migrations has ever been pushed to a hosted project.
+- **Problems/constraints:** see §9 (no git repo, stray `index_out.html`, hosted Supabase project not yet linked/migrations not pushed, cloud application status Unknown).
+- **Rough completion level (approximation, not measured):** ~20–25% of MVP scope. Milestones: M1 ≈ 95% (all automatable checks pass; only physical-device A2HS tap-through on iOS/Android remains — needs real hardware + HTTPS host), M2 ≈ 70% (cloud/auth-provider config + E2E signup verification outstanding), M3 ≈ 90% locally (CRUD + mutation pipeline + RLS migration + tests + docs complete; cloud push and live-policy verification outstanding — D14), M4–M10 = 0%.
 
 ---
 
 ## 3. Completed
 
-All items verified present in the repo on **2026-08-23**. Dates inferred from filenames/artifacts where noted.
+All items verified present in the repo on **2026-08-23**; rows dated 2026-08-24 were added after the M3 closeout session.
 
 | Item | Evidence | Date (inferred) | Notes |
 |---|---|---|---|
@@ -66,6 +66,11 @@ All items verified present in the repo on **2026-08-23**. Dates inferred from fi
 | Auth screens | `LoginScreen` (Google OAuth + password, Arabic error mapping incl. rate-limit/unconfirmed email), `SignupScreen` (confirmation gate), `ForgotPasswordScreen`, `UpdatePasswordScreen`, `AuthCallbackScreen` (PKCE exchange, race-safe vs detectSessionInUrl), `DashboardScreen` placeholder ("ستُبنى في الخطوة التالية") | ≤ 2026-08-22 | |
 | Routing/guards/primitives/validators | `src/App.tsx`, `src/components/ProtectedRoute.tsx`, `src/components/form-field.tsx` (AuthCard/FormField/Spinner), `src/lib/validation.ts` | ≤ 2026-08-22 | RTL-safe spacing; password min length 6 mirrors Supabase default |
 | Operator docs | `docs/supabase-setup.md` (hosted project, CLI, push, env vars), `docs/device-checklist.md` (manual iOS Safari A2HS + Android Chrome install checklist, stale-SW fix) | ≤ 2026-08-22 | |
+| M3 CRUD screens + nested routing | `src/screens/CategoriesScreen.tsx`, `BooksScreen.tsx`, `LecturersScreen.tsx`, `LecturesScreen.tsx`; nested routes wired in `src/App.tsx` (`/categories` → `/categories/:categoryId` → `/categories/:categoryId/books/:bookId` → `.../lecturers/:lecturerId`); shared `EntityDialog` + `ConfirmDeleteDialog` components; delete-blocking child-count checks before any delete | 2026-08-24 | |
+| Entity CRUD mutation pipeline | `src/lib/entity-crud.ts`: `createEntity` stamps `version=1`/`dirty=true`; `updateEntity` bumps `version` via `bumpVersion()`; every mutation writes row + outbox entry inside one Dexie transaction; `touchBookOpened()` fired once-per-entry from `LecturersScreen` (useRef guard vs StrictMode double-effect). Cloud push itself remains M5 | 2026-08-24 | |
+| XOR guards + unit spec | `src/lib/xor-guards.ts` (+ `.spec.ts`, 9 cases) mirroring the DB-level CHECK constraints `notes_book_xor_lecture` / `media_note_xor_lecture` locally | 2026-08-24 | Constraints themselves delivered early in the initial migration |
+| M3 hierarchy RLS migration | `supabase/migrations/20260824000001_m3_hierarchy_rls.sql` (+ revert `revert/20260824000001_m3_hierarchy_rls.down.sql`): policies `<table>_<op>_own` per operation for categories/books/lecturers (owner via `user_id = auth.uid()`, insert/update assert parent ownership); lectures owned transitively via lecturers→books; notes/note_links/media stay deny-by-default. **Not yet pushed to any cloud project** (D14) | 2026-08-24 | |
+| entity-crud spec with fake-indexeddb | `src/lib/entity-crud.spec.ts` (9 cases); `fake-indexeddb` devDependency added to `package.json`. Full suite: 22 tests / 3 files passing; typecheck + lint clean | 2026-08-24 | |
 
 ---
 
@@ -75,7 +80,7 @@ No task was observed mid-edit in the working tree. Three threads are open (state
 
 1. **M2 closeout — external Supabase configuration.** Done in code: screens, seeding SQL, `users` RLS. Remaining: enable Google OAuth provider + set redirect URLs in the Supabase dashboard, create/link a hosted project, run `supabase db push`. Blocked locally because the CLI binary could not be downloaded (§8); whether any hosted project already received the migrations is **Unknown**.
 2. **M1 residual — physical-device A2HS tap-through.** All automatable installability checks now pass (2026-08-23, see §15). The remaining tap-through on real iOS Safari + Android Chrome requires physical hardware and an HTTPS host/tunnel; `docs/device-checklist.md` success table stays unchecked until then.
-3. **Documentation reconciliation** — `tasks.md` M1 line updated 2026-08-23 with live-verification evidence; M2 checkboxes and parts of `docs/supabase-setup.md` §7 still lag behind implemented code (see §9).
+3. **Documentation reconciliation** — closed 2026-08-24: `tasks.md` M1 evidence note (2026-08-23), M2 checkboxes ticked, and M3 checkboxes ticked with an evidence blockquote (XOR CHECKs delivered early in the initial migration; RLS pending cloud push; 22/22 suite). `docs/supabase-setup.md` §7 rewritten as a migration log covering all three migrations + reverts (K4/K5 resolved).
 
 ---
 
@@ -83,12 +88,12 @@ No task was observed mid-edit in the working tree. Three threads are open (state
 
 ### Critical
 - [ ] Install Supabase CLI manually (per `docs/supabase-setup.md` §1) or push from another machine: `supabase link --project-ref <ref>` → `supabase db push`.
+- [ ] Push the M3 hierarchy RLS migration (`20260824000001_m3_hierarchy_rls.sql`) to the hosted Supabase project (`npx supabase link --project-ref <ref>` then `npx supabase db push`) and verify the `<table>_<op>_own` policies live — explicitly deferred by owner decision during M3 closeout (D14).
 - [ ] Configure Supabase Auth in the dashboard: Google OAuth provider; redirect URLs incl. `<origin>/auth/callback`, `/update-password` (replace localhost-only URLs in `supabase/config.toml`).
 - [ ] Verify end-to-end: fresh signup → confirmation email → login → seeded demo template visible immediately (closes final M2 checkbox in `tasks.md`).
 - [ ] Initialize a git repository and commit current state (repo is **not under version control** — highest operational risk).
 
 ### High
-- [ ] M3: CRUD UI for Category/Book/Lecturer/Lecture; RLS policies for the 7 tables still policy-less (deny-by-default currently blocks all writes); wire `version` increment + outbox enqueue on every local edit (incl. `books.last_opened_at`).
 - [ ] M5: push/pull sync engine driven by `outbox`/`sync_meta`; highest-`version`-wins conflicts; backoff; online/action/interval triggers.
 - [ ] Resolve `models.ts` ↔ SQL column-name mapping (`type` vs `note_type`/`media_type`) before the sync layer serializes rows (K4).
 
@@ -101,7 +106,7 @@ No task was observed mid-edit in the working tree. Three threads are open (state
 - [ ] M7: Storage buckets, 5-min audio cap, `media_trial_started_at` set at first upload, 30-day freeze/block-new via RLS + Storage policy, countdown UI (Pro upgrade flow out of MVP scope).
 - [ ] M8: `is_public` toggle, `/share/note_id` anon route, anon RLS scoped to public notes/links, Markdown export (`[[id]]`→`[[title]]`), PDF via `window.print()` + print stylesheet.
 - [ ] M10: accessibility pass, lazy-loaded graph, virtualized lists, code splitting, error reporting/analytics, `README.md`.
-- [ ] Housekeeping: remove stale `index_out.html`; refresh `docs/supabase-setup.md` §7; tick completed `tasks.md` boxes.
+- [ ] Housekeeping: remove stale `index_out.html` (`docs/supabase-setup.md` §7 refresh + `tasks.md` box-ticking were completed 2026-08-24).
 
 ---
 
@@ -122,6 +127,7 @@ No task was observed mid-edit in the working tree. Three threads are open (state
 | D11 | IBM Plex Sans Arabic; coverage enforced by `scripts/check-glyphs.mjs` | AGENTS.md font rule for iOS Safari/Android Chrome diacritics | Unverified system fonts | Testable guarantee before font changes |
 | D12 | Export: Markdown rewrites `[[id]]`→`[[title]]`; PDF via browser print pipeline (both Planned, M8) | AGENTS.md export rules; PRD FR-EX1..3 | Headless Chrome/server renderers | Zero extra infra in MVP |
 | D13 | Media trial starts at first upload, not signup; freeze = read-only, nothing deleted; new uploads blocked via RLS + Storage policy (Planned, M7) | AGENTS.md media freeze policy; PRD §5.4 | Trial from signup date | Fair trial window; storage is the only monetized path |
+| D14 | M3 RLS written but cloud push deferred | Owner chose to defer until the Supabase project/link is settled (CLI install was previously blocked) | Pushing immediately | Policies exist only in the repo until `db push` runs; hierarchy tables stay deny-by-default in any hosted project until then |
 
 No prior decision has been reversed. Any future reversal must be recorded here with its reason.
 
@@ -136,7 +142,8 @@ Chronological log (dates inferred from migration filenames/artifacts; no git his
 - **~2026-08-22** — Auth & onboarding (M2): six screens + routing/guards/form primitives/validators; `AuthProvider` incl. recovery RPC; Supabase client (PKCE, fail-fast env); sync helpers + vitest spec; M2 SQL migration (users RLS, email/created_at freeze, seed function, signup trigger, recovery RPC) + revert; rebuild into `dist/` (current bundle `index-SytsEip0.*`); `preview.log` records a successful `vite preview` run on `http://localhost:4173`.
 - **2026-08-23** — Project-state audit via direct inspection; this `PROJECT_STATE.md` created. No application files modified.
 - **2026-08-23 (later)** — M1 live verification session: created `.env.local` placeholders (gitignored) so the shell boots; `glyphs` PASS / `typecheck` / `lint` / `test` (4/4) clean; fresh production build; served `dist/` via `vite preview :4173`; browser-verified SW activated, manifest fields, 3 icons 200; offline reload rendered the full login shell from precache (also confirming ProtectedRoute redirect to `/login`); Lighthouse A11y 100 / Best Practices 100 / SEO 91. Added Arabic `meta[name=description]` to `index.html` (SEO 82→91); remaining Lighthouse failures (`robots.txt`, `llms.txt`) deferred as hosting concerns. `tasks.md` M1 verification line updated with evidence. Preview server stopped after session.
-- **Dependencies:** none added/removed since scaffold. **API:** none beyond Supabase client config. **Security changes:** RLS enabled day-one; `users` owner-row policies + immutable-column freeze trigger added in M2 migration.
+- **2026-08-24** — M3 closeout session: hierarchy CRUD screens existed from earlier same-day work (nested routing, shared `EntityDialog`/`ConfirmDeleteDialog`, delete-blocking child-count checks); added `src/lib/entity-crud.spec.ts` with `fake-indexeddb` devDependency bringing the suite to 22/22 across 3 files; typecheck + lint green; M3 RLS migration (+revert) confirmed in-repo with cloud push deferred by owner decision (D14); docs reconciled — `tasks.md` M3 boxes ticked + evidence blockquote, `docs/supabase-setup.md` §7 rewritten as a migration log covering all three migrations, this file updated (K4/K5 resolved). Split commits planned.
+- **Dependencies:** `fake-indexeddb` (dev) and `supabase` CLI (dev, installed earlier same day) added during the 2026-08-24 sessions. **API:** none beyond Supabase client config. **Security changes:** RLS enabled day-one; `users` owner-row policies + immutable-column freeze trigger added in M2 migration; hierarchy `<table>_<op>_own` policies for categories/books/lecturers (+ transitive lectures ownership) added in M3 migration — repo-only until cloud push runs (D14).
 
 ---
 
@@ -161,8 +168,8 @@ Unresolved problems are listed in §9.
 | K1 | Repo is **not a git repository** (no `.git`) despite `.gitignore` existing — no history or backup | High | Open |
 | K2 | Whether any hosted Supabase project exists and has these migrations applied: **Unknown** | High | Open |
 | K3 | Naming mismatch: TypeScript `CloudNote.type`/`CloudMedia.type` vs SQL columns `note_type`/`media_type` (`src/types/models.ts` vs initial schema). Mapping implicit; future sync serializer must translate explicitly or inserts will fail | Medium | Open (design gap) |
-| K4 | `tasks.md` stale: all M2 checkboxes unticked although the M2 migration and all auth screens verifiably exist | Medium | Open (doc drift) |
-| K5 | `docs/supabase-setup.md` §7 outdated: lists only the initial migration and states RLS "بدون سياسات بعد", ignoring the 2026-08-22 M2 policies | Medium | Open (doc drift) |
+| K4 | `tasks.md` stale: all M2 checkboxes unticked although the M2 migration and all auth screens verifiably exist | Medium | Resolved 2026-08-24 (M2 boxes ticked earlier same day; M3 boxes ticked with evidence blockquote during doc reconciliation) |
+| K5 | `docs/supabase-setup.md` §7 outdated: lists only the initial migration and states RLS "بدون سياسات بعد", ignoring the 2026-08-22 M2 policies | Medium | Resolved 2026-08-24 (§7 rewritten as a migration log covering initial/M2/M3 + reverts) |
 | K6 | `supabase/config.toml` auth URLs are localhost-only; production redirect URL set undefined until a host is chosen | Medium | Open |
 | K7 | Stray root file `index_out.html`: stale copy of an older built `index.html` referencing hashed assets (`index-DVK5C-sT.js`) absent from current `dist/` (`index-SytsEip0.js`) | Low | Open (housekeeping) |
 | K8 | No `README.md` although `tasks.md` M10 schedules one | Low | Open (planned) |
@@ -243,7 +250,7 @@ Binding for any AI Agent editing this project:
 2. **Do not change architectural decisions silently.** Any reversal must be recorded in §6 (Decisions) with the reason and rejected alternative.
 3. **Do not mark a task complete without verification** — evidence must exist in the repo (code, passing check, or executed test). Update `tasks.md` checkboxes only when actually done.
 4. **Do not remove existing functionality without clear justification** recorded here.
-5. **Update this file (`PROJECT_STATE.md`) after major achievements**, and keep `tasks.md`/docs from drifting behind reality (currently K4/K5).
+5. **Update this file (`PROJECT_STATE.md`) after major achievements**, and keep `tasks.md`/docs from drifting behind reality (K4/K5 were resolved 2026-08-24; keep it that way).
 6. **Consult this file before large changes.**
 7. Schema changes go through idempotent + reversible `supabase/migrations/*` files with matching `revert/*.down.sql`; no ad-hoc DDL. Update the matching table description in `tazkerat-altaleb-prd.md` in the same commit when schema changes (AGENTS.md convention).
 8. Enforce domain rules at the DB level (XOR CHECKs/triggers), never only in UI.
@@ -260,6 +267,7 @@ No git history exists; phases below are reconstructed from file evidence (migrat
 - **2026-08-21 (approx.)** — M1 Foundation: scaffolded Vite+React+TS+Tailwind v4 project; PWA manifest/icons/SW; Arabic fonts + glyph checker; Dexie schema; domain types; hand-created `supabase/config.toml` after CLI download failure; wrote initial schema migration (+revert) including early RLS enablement; wrote operator docs. Issue found: GitHub throttling blocked CLI install.
 - **2026-08-22 (approx.)** — M2 Auth & Onboarding: built all five auth screens + callback + guards + form primitives + validators; `AuthProvider` with recovery RPC; fail-fast Supabase client; sync helpers + unit spec; wrote M2 SQL migration (+revert) with users RLS, email/created_at freeze trigger, demo seeding function, signup trigger, recovery RPC; produced a fresh build (`dist/`) and ran `vite preview` (:4173). Issues found: seeding-failure stranding risk (solved via recovery RPC), email-desync risk (solved via freeze trigger).
 - **2026-08-23** — Documentation/state audit session: full repo inspection; created `PROJECT_STATE.md`; identified doc drift (K4/K5), stray `index_out.html` (K7), missing README (K8), missing git repo (K1), unknown cloud-application status (K2), `type` vs `note_type` mapping gap (K3). Next task: external Supabase configuration + E2E signup verification.
+- **2026-08-24 (approx.)** — M3 Content Hierarchy closeout: built hierarchy CRUD screens with nested routing (`CategoriesScreen` → `BooksScreen` → `LecturersScreen` → `LecturesScreen`), shared `EntityDialog`/`ConfirmDeleteDialog`, and delete-blocking child-count checks; wrote the `entity-crud.ts` mutation pipeline (`createEntity`/`updateEntity` stamping/bumping `version`, row + outbox entry in one Dexie transaction) and once-per-entry `touchBookOpened()`; authored M3 RLS migration (+revert) — cloud push deferred by owner decision (D14); added `src/lib/entity-crud.spec.ts` (fake-indexeddb devDependency) for a 22/22 suite with typecheck/lint green. Issue found: stale `tasks.md` checkbox claiming XOR CHECKs were undelivered (they shipped early in the initial migration). Docs reconciled same day: `tasks.md` M2/M3 boxes ticked + evidence blockquote, `supabase-setup.md` §7 migration log rewritten, K4/K5 closed. Next task: link/push migrations to a hosted Supabase project and verify policies live.
 
 ---
 
