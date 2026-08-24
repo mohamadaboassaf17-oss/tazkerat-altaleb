@@ -19,6 +19,8 @@ interface FormFieldProps {
   /** Arabic error message, or null/undefined when the field is valid. */
   error?: string | null;
   type?: 'text' | 'email' | 'password';
+  /** Hints mobile keyboards, e.g. 'numeric' for page/duration fields. */
+  inputMode?: 'numeric';
   autoComplete?: string;
   placeholder?: string;
   disabled?: boolean;
@@ -30,6 +32,7 @@ export function FormField({
   onChange,
   error = null,
   type = 'text',
+  inputMode,
   autoComplete,
   placeholder,
   disabled = false,
@@ -54,6 +57,7 @@ export function FormField({
         }`}
         disabled={disabled}
         id={id}
+        inputMode={inputMode}
         name={id}
         onChange={handleChange}
         placeholder={placeholder}

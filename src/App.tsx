@@ -1,10 +1,14 @@
 import type { ReactElement } from 'react';
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Navigate, Outlet, Route, Routes } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute';
 import { useAuth } from './lib/auth';
 import AuthCallbackScreen from './screens/AuthCallbackScreen';
+import BooksScreen from './screens/BooksScreen';
+import CategoriesScreen from './screens/CategoriesScreen';
 import DashboardScreen from './screens/DashboardScreen';
 import ForgotPasswordScreen from './screens/ForgotPasswordScreen';
+import LecturersScreen from './screens/LecturersScreen';
+import LecturesScreen from './screens/LecturesScreen';
 import LoginScreen from './screens/LoginScreen';
 import SignupScreen from './screens/SignupScreen';
 import UpdatePasswordScreen from './screens/UpdatePasswordScreen';
@@ -44,13 +48,24 @@ export default function App() {
             <Route path="/update-password" element={<UpdatePasswordScreen />} />
             <Route path="/auth/callback" element={<AuthCallbackScreen />} />
             <Route
-              path="/dashboard"
               element={
                 <ProtectedRoute>
-                  <DashboardScreen />
+                  <Outlet />
                 </ProtectedRoute>
               }
-            />
+            >
+              <Route path="/dashboard" element={<DashboardScreen />} />
+              <Route path="/categories" element={<CategoriesScreen />} />
+              <Route path="/categories/:categoryId" element={<BooksScreen />} />
+              <Route
+                path="/categories/:categoryId/books/:bookId"
+                element={<LecturersScreen />}
+              />
+              <Route
+                path="/categories/:categoryId/books/:bookId/lecturers/:lecturerId"
+                element={<LecturesScreen />}
+              />
+            </Route>
             <Route path="*" element={<Navigate replace to="/" />} />
           </Routes>
         </main>

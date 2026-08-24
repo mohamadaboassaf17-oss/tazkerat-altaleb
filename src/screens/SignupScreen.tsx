@@ -1,7 +1,8 @@
 import { useState, type FormEvent, type ReactElement } from 'react';
 import type { AuthError } from '@supabase/supabase-js';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { AuthCard, FormField, Spinner } from '../components/form-field';
+import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
 import { validateEmail, validatePassword } from '../lib/validation';
 
@@ -31,6 +32,8 @@ function mapSignupError(error: AuthError): string {
 }
 
 export default function SignupScreen(): ReactElement {
+  const { user } = useAuth();
+
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -43,6 +46,13 @@ export default function SignupScreen(): ReactElement {
   // enable_confirmations = true) a successful signUp resolves with a user
   // but NO session — the account is inert until the inbox link is clicked.
   const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
+
+  // An authenticated user must always land on the dashboard, even when
+  // stale local `awaitingConfirmation` state says otherwise — mirrors the
+  // top-of-component guard in LoginScreen.
+  if (user !== null) {
+    return <Navigate replace to="/dashboard" />;
+  }
 
   if (awaitingConfirmation) {
     return (
@@ -99,12 +109,12 @@ export default function SignupScreen(): ReactElement {
         return;
       }
 
-      // Hosted projects with email confirmation disabled resolve signUp with
-      // an active session immediately — route the user onward exactly like
-      // LoginScreen does (onAuthStateChange flips the context `user`, which
-      // swaps this render for <Navigate to="/dashboard">; keep the spinner
-      // up in the interim). Only fall back to the verify-email screen when
-      // no session came back.
+      // With email confirmation disabled on the hosted project, signUp
+      // resolves with an active session immediately: onAuthStateChange
+      // flips the context `user`, and the top-of-component guard swaps
+      // this render for <Navigate to="/dashboard"> (mirrors LoginScreen).
+      // Keep the spinner up in the interim. Only fall back to the
+      // verify-email screen when no session came back.
       if (data.session !== null) {
         return;
       }
