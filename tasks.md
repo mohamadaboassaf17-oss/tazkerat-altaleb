@@ -35,24 +35,30 @@
 
 ## M4 — Notes & Local Graph
 
-- [ ] Note editor component (content + type selector)
-- [ ] Title extraction on save: first non-blank line of `content` → `notes.title`
-- [ ] `[[` autocomplete popover: live filter on other note titles, insert as `[[note_id|display]]`
-- [ ] `note_links` rebuild on every save: parse `[[id]]` from content, `DELETE` old + `INSERT` new in one transaction
-- [ ] Resolve `display` from current title at render time (handle title renames)
-- [ ] Local knowledge graph: read Dexie, render nodes (notes) and edges (note_links), centered on notes attached to most recently opened book
-- [ ] Strip tashkeel in graph node labels and autocomplete labels only
-- [ ] Test: adding/removing `[[` reflects in graph on next save, no orphan edges
+- [x] Note editor component (content + type selector)
+- [x] Title extraction on save: first non-blank line of `content` → `notes.title`
+- [x] `[[` autocomplete popover: live filter on other note titles, insert as `[[note_id|display]]`
+- [x] `note_links` rebuild on every save: parse `[[id]]` from content, `DELETE` old + `INSERT` new in one transaction
+- [x] Resolve `display` from current title at render time (handle title renames)
+- [x] Local knowledge graph: read Dexie, render nodes (notes) and edges (note_links), centered on notes attached to most recently opened book
+- [x] Strip tashkeel in graph node labels and autocomplete labels only
+- [x] Test: adding/removing `[[` reflects in graph on next save, no orphan edges
+
+> ✅ Implemented (2026-08-25): data layer in `src/lib/arabic-text.ts` (stripTashkeel U+064B–U+065F + U+0670), `src/lib/note-text.ts` (extractTitle sanitizes `[[target|display]]`→display text with whitespace collapse + line fallthrough + 'بدون عنوان' fallback — D18; parseWikiLinks dedups), `src/lib/note-crud.ts` (createNote/updateNote/deleteNote mirroring the entity-crud pipeline: version bump, row + links + outbox entry in ONE Dexie transaction; deleteNote removes outgoing AND incoming edges mirroring the cloud double CASCADE; zero `note_links` outbox entries = D10). Editor UI: `wiki-autocomplete.tsx` (caret-tracked `[[` popover, tashkeel-stripped matching, keyboard nav, inserts `[[uuid|title]]`, Arabic load-failure alert «تعذّر تحميل الاقتراحات», live-DOM insertion), `note-editor.tsx` (derived-title preview, NO title input, 5-type Arabic selector, empty-content guard), `NoteEditorScreen.tsx` (`/notes/new?book=`|`?lecture=` XOR-validated create mode, `/notes/:noteId` edit mode, delete via ConfirmDeleteDialog). Entry points per D17: book-notes section «الملاحظات المرتبطة بالكتاب» on LecturersScreen bound to `:bookId`; per-row «+ ملاحظة» + live count «ملاحظات: N» on LecturesScreen rows; BooksScreen reverted untouched. Graph: `react-force-graph-2d@1.29.1` (D16) on `/graph` route via GraphScreen — nodes colored per note type (حفظ solid #1e6f50) + legend, labels tashkeel-stripped/truncated 16 chars, edges filtered to existing endpoints, cluster centering = max `books.last_opened_at` with two-hop lecturers→lectures join (inner golden-angle ring vs outer ring), click node → editor. Tests: `arabic-text.spec.ts` (8) + `note-text.spec.ts` (21) + `note-crud.spec.ts` (7) on top of the 22 pre-existing — full suite 58/58 across 6 files, typecheck + lint clean, glyphs PASS, production build OK (pre-existing >500 kB chunk warning for the graph bundle; lazy-load deferred to M10). Live E2E against `vite preview` :4173 + real Supabase project passed: signup → hierarchy created via UI → two book-notes → `[[` autocomplete insertion verbatim → save → IndexedDB edge present → token removed → save → edge gone with no orphans → version 1→2→3 with dirty=true, tashkeel preserved in bodies, outbox exclusively `table_name='notes'`; lecture-note flow «ملاحظات: 0»→«ملاحظات: 1»; graph rendering pixel-verified after fixing a mount defect found live (ResizeObserver attached while the loading branch hid the container → fixed by always-rendered container + eager `measure()`). RLS landed in `supabase/migrations/20260825000001_m4_notes_rls.sql` (+revert) but is **pending cloud push** (continuation of D14).
 
 ## M5 — Sync Engine
 
-- [ ] Push queue: mark rows dirty on local edit, store in Dexie `outbox` table
-- [ ] Push worker: send dirty rows with current `version`; on 409/conflict, compare server `version` and accept the higher one
-- [ ] Pull worker: fetch rows where server `version > local_version`, upsert to Dexie
-- [ ] Sync loop: trigger on `online` event, on user action, and on a debounced interval
-- [ ] Exponential backoff + retry on transient errors
-- [ ] Test offline → edit → reconnect → edit appears in cloud; concurrent edit → highest `version` wins
-- [ ] `last_opened_at` flows through sync without clobbering newer values
+- [x] Push queue: mark rows dirty on local edit, store in Dexie `outbox` table
+- [x] Push worker: send dirty rows with current `version`; on 409/conflict, compare server `version` and accept the higher one
+- [x] Pull worker: fetch rows where server `version > local_version`, upsert to Dexie
+- [x] Sync loop: trigger on `online` event, on user action, and on a debounced interval
+- [x] Exponential backoff + retry on transient errors
+- [x] Test offline → edit → reconnect → edit appears in cloud; concurrent edit → highest `version` wins
+- [x] `last_opened_at` flows through sync without clobbering newer values
+
+> ✅ Implemented (2026-08-25): DB guard first — `supabase/migrations/20260825000002_m5_sync_conflict_guard.sql` (+revert): shared `assert_sync_version()` BEFORE INSERT OR UPDATE trigger on users/categories/books/lecturers/lectures/notes/media (note_links excluded — derived per D10); rejects UPDATE where NEW.version <= OLD.version via `RAISE EXCEPTION ERRCODE 'P0001' MESSAGE 'SYNC_CONFLICT|'||OLD.version::text`; INSERT path passthrough; idempotent + reversible; PRD §7 got a one-line note and `docs/supabase-setup.md` §4+§7 got the migration-log entry. Serialization: `src/lib/sync-serialize.ts` (+17-test spec) — explicit local↔cloud mapping resolving K3 (`notes.type`↔`note_type`, `media.type`↔`media_type`); throws on note_links (D10) and unknown tables; `OutboxEntry` extended with attempts/next_attempt_at/last_error (non-indexed, no Dexie schema change). Push (`src/lib/sync-push.ts`): strict-FIFO drain stopping at the first unready/failed entry; auth gate; `upsert(onConflict:'id')` with payload run through toCloudRow; delete idempotent; P0001-conflict AND insert-time 23505 both ADOPT the server row (dirty=false, one Dexie transaction per finalize/adopt); transient errors get backoffMs(attempts)=min(1000·2^(n−1),60000)±20% jitter persisted as `next_attempt_at`. Pull (`src/lib/sync-pull.ts`): fixed order users→categories→books→lecturers→lectures→notes→media; per-user cursor keys `pull_cursor_<uid>_<table>` in sync_meta; `.range()` pagination PAGE_SIZE=500 until short page (mid-loop abort never advances the cursor); ±5s overlap window gte; dirty rows NEVER clobbered, clean rows replaced only when incoming.version > local.server_version — which also covers the `last_opened_at` non-clobbering requirement; pulled notes + derived note_links rebuilt atomically in ONE transaction. Loop (`src/lib/sync-engine.ts`): single-flight runSyncCycle (pull→push, never throws outward); SyncStatus {idle|syncing|error, pendingCount} pub/sub (listener throw isolated); startSyncEngine() registers online + 30s interval + visibilitychange listeners with idempotent cleanup; wiring = queueOutbox schedules one debounced ~3s cycle, AuthProvider starts/stops the engine on SIGNED_IN/sign-out. Tests: sync-push 15 / sync-pull 13 / sync-engine 10 (+17 serialize) covering conflict adoption, tie-break (server wins equal versions), FIFO stop, pagination, atomicity rollback, subscriber-throw isolation, offline→edit→cycle→upsert flow — full suite **113 tests / 10 files passing**, typecheck + lint clean. Reviewer pass fixed F1 blocker (payload not serialized on push path), F3 pagination truncation, F6 link atomicity, F7 notify recursion. **Cloud-gated, not claimable**: migrations remain repo-only until a human runs `npx supabase login` (no access token exists on this machine; the CLI itself works locally as a devDependency), then `db push`; live E2E sync verification against the hosted project is therefore also pending. **Residual manual step for the two test boxes above**: the offline→edit→reconnect→cloud and concurrent-edit behaviors are verified by mocked integration specs only — live verification against the real Supabase project awaits the token + db push. Auth redirect URLs remain localhost-only (K6) and Google OAuth is disabled pending owner credentials.
+
+> ⚠️ Known design gap (reviewer finding F4): remote deletes do NOT propagate between devices — pull observes only existing rows (no tombstone mechanism), so a row deleted+pushed on device B survives as a clean ghost on device A, and push-side upsert can resurrect remotely-deleted rows. Local deletes propagate normally via the outbox. Needs a product decision (soft-delete/tombstone column vs accept-for-MVP) — recorded as an open Medium issue in PROJECT_STATE.md §9.
 
 ## M6 — SRS
 
