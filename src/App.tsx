@@ -7,9 +7,11 @@ import BooksScreen from './screens/BooksScreen';
 import CategoriesScreen from './screens/CategoriesScreen';
 import DashboardScreen from './screens/DashboardScreen';
 import ForgotPasswordScreen from './screens/ForgotPasswordScreen';
+import GraphScreen from './screens/GraphScreen';
 import LecturersScreen from './screens/LecturersScreen';
 import LecturesScreen from './screens/LecturesScreen';
 import LoginScreen from './screens/LoginScreen';
+import NoteEditorScreen from './screens/NoteEditorScreen';
 import SignupScreen from './screens/SignupScreen';
 import UpdatePasswordScreen from './screens/UpdatePasswordScreen';
 
@@ -65,6 +67,9 @@ export default function App() {
                 path="/categories/:categoryId/books/:bookId/lecturers/:lecturerId"
                 element={<LecturesScreen />}
               />
+              <Route path="/notes/new" element={<NoteEditorScreen />} />
+              <Route path="/notes/:noteId" element={<NoteEditorScreen />} />
+              <Route path="/graph" element={<GraphScreen />} />
             </Route>
             <Route path="*" element={<Navigate replace to="/" />} />
           </Routes>

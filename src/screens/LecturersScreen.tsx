@@ -4,6 +4,7 @@ import { Link, useParams } from 'react-router-dom';
 import { ConfirmDeleteDialog } from '../components/confirm-delete-dialog';
 import { EntityDialog } from '../components/entity-dialog';
 import { FormField } from '../components/form-field';
+import { NoteTypeBadge } from '../components/note-editor';
 import { useAuth } from '../lib/auth';
 import {
   countLecturerChildren,
@@ -14,7 +15,7 @@ import {
 } from '../lib/entity-crud';
 import { validateRequiredText } from '../lib/entity-validation';
 import { db } from '../lib/db';
-import type { LocalBook, LocalLecturer } from '../types/models';
+import type { LocalBook, LocalLecturer, LocalNote } from '../types/models';
 
 const LOAD_ERROR = 'تعذّر تحميل المدرّسين المحليين.';
 const SESSION_ERROR = 'انتهت الجلسة، أعد تسجيل الدخول.';
@@ -41,6 +42,8 @@ export default function LecturersScreen(): ReactElement {
   const [deleteTarget, setDeleteTarget] = useState<LocalLecturer | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  const [notes, setNotes] = useState<LocalNote[]>([]);
 
   // last_opened_at fires once per entry into the book's detail view —
   // never per render. The ref survives StrictMode's double effect pass;
@@ -113,6 +116,27 @@ export default function LecturersScreen(): ReactElement {
 
     return () => subscription.unsubscribe();
   }, [user, bookId]);
+
+  useEffect(() => {
+    if (bookId === undefined) {
+      setNotes([]);
+      return;
+    }
+
+    const subscription = liveQuery(() =>
+      db.notes.where('book_id').equals(bookId).toArray(),
+    ).subscribe({
+      next: (rows) => {
+        setNotes([...rows].sort((a, b) => b.created_at.localeCompare(a.created_at)));
+      },
+      error: (error: unknown) => {
+        console.error('Failed to load book notes:', error);
+        setPageError(LOAD_ERROR);
+      },
+    });
+
+    return () => subscription.unsubscribe();
+  }, [bookId]);
 
   function openCreate(): void {
     setEditing(null);
@@ -298,6 +322,41 @@ export default function LecturersScreen(): ReactElement {
           ))}
         </ul>
       )}
+
+      <section className="mt-10">
+        <div className="flex items-center justify-between gap-4">
+          <h3 className="truncate text-lg font-bold text-brand-800">
+            الملاحظات المرتبطة بالكتاب
+          </h3>
+          <Link
+            className="shrink-0 rounded-lg bg-brand-600 px-4 py-2 font-medium text-white transition-colors hover:bg-brand-700"
+            to={`/notes/new?book=${bookId}`}
+          >
+            ملاحظة جديدة
+          </Link>
+        </div>
+        {notes.length === 0 ? (
+          <p className="mt-4 rounded-2xl border border-dashed border-neutral-300 bg-white p-6 text-center text-neutral-600">
+            لا توجد ملاحظات بعد
+          </p>
+        ) : (
+          <ul className="mt-4 flex flex-col gap-3">
+            {notes.map((noteItem) => (
+              <li key={noteItem.id}>
+                <Link
+                  className="flex items-center gap-3 rounded-xl bg-white p-4 shadow-sm transition-colors hover:bg-brand-50"
+                  to={`/notes/${noteItem.id}`}
+                >
+                  <span className="min-w-0 flex-1 truncate font-medium text-neutral-900">
+                    {noteItem.title}
+                  </span>
+                  <NoteTypeBadge type={noteItem.type} />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       {isFormOpen && (
         <EntityDialog

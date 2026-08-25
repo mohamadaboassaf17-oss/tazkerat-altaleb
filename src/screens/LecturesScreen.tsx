@@ -44,6 +44,8 @@ export default function LecturesScreen(): ReactElement {
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  const [noteCounts, setNoteCounts] = useState<Record<string, number>>({});
+
   useEffect(() => {
     let active = true;
 
@@ -91,6 +93,34 @@ export default function LecturesScreen(): ReactElement {
         console.error('Failed to load lectures:', error);
         setPageError(LOAD_ERROR);
         setIsLoading(false);
+      },
+    });
+
+    return () => subscription.unsubscribe();
+  }, [lecturerId]);
+
+  useEffect(() => {
+    if (lecturerId === undefined) {
+      setNoteCounts({});
+      return;
+    }
+
+    const subscription = liveQuery(async () => {
+      const rows = await db.lectures.where('lecturer_id').equals(lecturerId).toArray();
+      const entries = await Promise.all(
+        rows.map(async (lecture): Promise<readonly [string, number]> => [
+          lecture.id,
+          await db.notes.where('lecture_id').equals(lecture.id).count(),
+        ]),
+      );
+      return Object.fromEntries(entries);
+    }).subscribe({
+      next: (counts) => {
+        setNoteCounts(counts);
+      },
+      error: (error: unknown) => {
+        console.error('Failed to load lecture note counts:', error);
+        setPageError(LOAD_ERROR);
       },
     });
 
@@ -297,6 +327,17 @@ export default function LecturesScreen(): ReactElement {
                     </span>
                   )}
                 </span>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <span className="text-xs text-neutral-500">
+                  ملاحظات: {noteCounts[lecture.id] ?? 0}
+                </span>
+                <Link
+                  className="rounded-lg px-2 py-1 text-xs font-medium text-brand-700 transition-colors hover:bg-brand-50"
+                  to={`/notes/new?lecture=${lecture.id}`}
+                >
+                  + ملاحظة
+                </Link>
               </div>
               <button
                 className="shrink-0 rounded-lg px-3 py-1.5 text-sm font-medium text-brand-700 transition-colors hover:bg-brand-50"
