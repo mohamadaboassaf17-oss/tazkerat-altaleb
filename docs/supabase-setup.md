@@ -57,6 +57,8 @@ supabase db push
 20260821000001_initial_schema.sql
 20260822000001_m2_auth_onboarding.sql
 20260824000001_m3_hierarchy_rls.sql
+20260825000001_m4_notes_rls.sql
+20260825000002_m5_sync_conflict_guard.sql
 ```
 
 لكل ترحيل نسخة تراجع مقابل في `supabase/migrations/revert/<اسم_الملف>.down.sql`. للتراجع يدوياً عند الحاجة (مثال — الترحيل الأول):
@@ -88,7 +90,7 @@ VITE_SUPABASE_ANON_KEY=<anon-public-key>
 - `VITE_SUPABASE_URL` ← **Project Settings → API → Project URL**
 - `VITE_SUPABASE_ANON_KEY` ← **Project Settings → API → Project API keys → anon / public**
 
-> مفتاح `anon` آمن للواجهة الأمامية فقط بشرط تفعيل RLS — وهو مفعّل على كل الجداول منذ الترحيل الأول؛ سياسات M2/M3 (جدول `users` + التسلسل الهرمي) موجودة في ملفات الترحيل داخل المستودع، لكنها **لم تُطبَّق على أي مشروع مستضاف بعد** (انظر §7).
+> مفتاح `anon` آمن للواجهة الأمامية فقط بشرط تفعيل RLS — وهو مفعّل على كل الجداول منذ الترحيل الأول؛ سياسات M2/M3/M4 (جدول `users` + التسلسل الهرمي + الملاحظات والروابط) موجودة في ملفات الترحيل داخل المستودع، لكنها **لم تُطبَّق على أي مشروع مستضاف بعد** (انظر §7).
 
 ## 7. ما الذي تنشئه الترحيلات؟ (سجل الترحيلات)
 
@@ -122,3 +124,19 @@ VITE_SUPABASE_ANON_KEY=<anon-public-key>
 - تبقى `notes` و`note_links` و`media` عمداً دون سياسات (deny-by-default) حتى مراحلها اللاحقة.
 
 > ⚠️ **لم يُطبَّق هذا الترحيل بعد على أي مشروع Supabase مستضاف** — الدفع مؤجَّل بقرار من المالك حتى تسوية ربط المشروع (`supabase link` / `supabase db push`)، انظر PROJECT_STATE.md §6 D14.
+
+### 4) `20260825000001_m4_notes_rls.sql` (2026-08-25) — RLS الملاحظات والروابط
+التراجع: `revert/20260825000001_m4_notes_rls.down.sql`
+
+- سياسات RLS باسم `<table>_<op>_own` لكل عملية على `notes`: ملكية الصف عبر `user_id = auth.uid()` مع تأكيد ملكية الأب في كل العمليات — كتاب مباشرةً عبر `books.user_id`، أو محاضرة عبر المسار المتعدي `lectures → lecturers → books`، أو ملاحظة مستقلة بلا أب (`book_id` و`lecture_id` معاً NULL — مسموح).
+- سياسات على `note_links`: الملكية مشتقة من ملاحظة المصدر عبر ربط `source_note_id` بـ `public.notes.user_id = auth.uid()`، ويضيف INSERT وUPDATE شرط وجود ملاحظة الهدف وانتمائها لنفس المستخدم (دفاع متعمق ضد إنشاء روابط عابرة للمستخدمين — قيود FK تضمن الوجود لا نفس الملكية).
+- تبقى `media` عمداً دون سياسات (deny-by-default) حتى مرحلتها اللاحقة.
+- الدفع إلى السحابة ما زال مؤجَّلاً (استكمال قرار D14) — السياسات تسري فقط عند تطبيق الترحيلات على مشروع مستضاف.
+
+### 5) `20260825000002_m5_sync_conflict_guard.sql` (2026-08-25) — حارس تعارضات المزامنة
+التراجع: `revert/20260825000002_m5_sync_conflict_guard.down.sql`
+
+- دالة مشتركة `assert_sync_version()` مُرفقة كمشغّل BEFORE INSERT OR UPDATE باسم `trg_<table>_version_guard` على الجداول القابلة للتعديل السبعة فقط (`users, categories, books, lecturers, lectures, notes, media`).
+- على UPDATE: أي كتابة بـ `version` لا تتجاوز الحالية (`NEW.version <= OLD.version`) تُرفض بخطأ `SYNC_CONFLICT|<server_version>` برمز `P0001` — يفوز أعلى إصدار دائماً، والتعادل (إصدار متساوٍ) يُحسم لصالح الصف الموجود على الخادم (first-writer wins)، ويقرأ عامل الدفع في العميل رسالة الخطأ لمعرفة إصدار الخادم.
+- على INSERT: لا مقارنة ممكنة (لا صف قديم) — يمر بصمت، وتبقى بذور `seed_demo_template()` بالإصدار الافتراضي 1 غير متأثرة.
+- `note_links` مستبعدة عمداً (بيانات مشتقة تُعاد بناؤها من `notes.content` — قرار D10)؛ الترحيل قابل لإعادة التشغيل وقابل للتراجع بالكامل.
