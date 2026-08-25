@@ -3,12 +3,14 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactElement,
   type ReactNode,
 } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from './supabase';
+import { runSyncCycle, startSyncEngine } from './sync-engine';
 
 /**
  * Auth context contract — downstream tasks depend on these exact names.
@@ -61,6 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }): ReactElemen
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [authError, setAuthError] = useState<Error | null>(null);
+  const syncStopRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -86,7 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }): ReactElemen
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    } = supabase.auth.onAuthStateChange((event, nextSession) => {
       if (!isMounted) return;
       // Covers INITIAL_SESSION, SIGNED_IN, SIGNED_OUT, TOKEN_REFRESHED
       // and USER_UPDATED — every event we care about carries the current
@@ -94,12 +97,26 @@ export function AuthProvider({ children }: { children: ReactNode }): ReactElemen
       setSession(nextSession);
       if (nextSession !== null) {
         requestDemoSeedOnce();
+        // INITIAL_SESSION covers reloads with a persisted session and
+        // SIGNED_IN covers fresh logins — either way the M5 sync engine
+        // goes live with an immediate cycle (start is idempotent).
+        if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
+          syncStopRef.current?.();
+          syncStopRef.current = startSyncEngine();
+          void runSyncCycle();
+        }
+      } else {
+        // Signed out — stop the engine's timers and listeners.
+        syncStopRef.current?.();
+        syncStopRef.current = null;
       }
     });
 
     return () => {
       isMounted = false;
       subscription.unsubscribe();
+      syncStopRef.current?.();
+      syncStopRef.current = null;
     };
   }, []);
 

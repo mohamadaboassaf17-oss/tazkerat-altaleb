@@ -173,6 +173,11 @@ export type LocalMedia = CloudMedia & SyncFields;
 /**
  * One pending change queued in the local outbox, awaiting push to Supabase.
  * `seq` is auto-incremented by IndexedDB (`++seq`).
+ *
+ * Retry bookkeeping (`attempts`, `next_attempt_at`, `last_error`) lives on
+ * the entry rather than in a side table so a failed push survives app
+ * restarts. These fields are never indexed, so they require no Dexie
+ * schema declaration.
  */
 export interface OutboxEntry {
   seq?: number;
@@ -181,6 +186,22 @@ export interface OutboxEntry {
   record_id: string;
   payload: unknown;
   queued_at: string;
+  /**
+   * Number of failed push attempts recorded so far. Absent until the
+   * first failure; a successful push removes the entry entirely.
+   */
+  attempts?: number;
+  /**
+   * Earliest time (ISO-8601) at which the push layer may retry this
+   * entry — drives the backoff schedule. Null or absent means the entry
+   * is eligible for an immediate attempt.
+   */
+  next_attempt_at?: string | null;
+  /**
+   * Message carried over from the most recent failed push attempt, kept
+   * for diagnostics only. Null or absent while the entry has never failed.
+   */
+  last_error?: string | null;
 }
 
 /** Single key-value row of the `sync_meta` store (e.g. last pull cursor). */
