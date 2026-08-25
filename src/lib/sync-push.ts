@@ -49,9 +49,30 @@ const LOCAL_TABLES: Record<SyncableTableName, Table<Record<string, unknown>, str
   media: db.media as unknown as Table<Record<string, unknown>, string>,
 };
 
+/**
+ * Minimal write-side view of the Supabase query builder.
+ *
+ * The singleton client ships without generated table types, so chaining
+ * `.from(<union table name>)` collapses the row generics to `never` and
+ * rejects every payload at compile time. The push layer owns row shapes
+ * locally (`Record<string, unknown>` rows mapped through `toCloudRow`),
+ * so it narrows the builder through `unknown` to exactly the wire contract
+ * it needs — mirroring `LOCAL_TABLES` above.
+ */
+interface UpsertBuilder {
+  upsert(
+    payload: Record<string, unknown>,
+    options: { onConflict: string },
+  ): PromiseLike<{ data: unknown; error: PostgrestError | null }>;
+}
+
+/** View `.from(table)` as an {@link UpsertBuilder} (see interface docs). */
+function upsertInto(table: SyncableTableName): UpsertBuilder {
+  return supabase.from(table) as unknown as UpsertBuilder;
+}
+
 /** Backoff base (first retry delay) in milliseconds. */
 export const BASE_BACKOFF_MS = 1000;
-
 /** Upper bound for any single retry delay, in milliseconds. */
 export const MAX_BACKOFF_MS = 60_000;
 
@@ -160,9 +181,8 @@ async function processEntry(entry: OutboxEntry): Promise<EntryOutcome> {
   }
 
   const payload = toCloudRow(table, requirePayloadObject(entry));
-  const { error }: { data: unknown; error: PostgrestError | null } = await supabase
-    .from(table)
-    .upsert(payload, { onConflict: 'id' });
+  const { error }: { data: unknown; error: PostgrestError | null } =
+    await upsertInto(table).upsert(payload, { onConflict: 'id' });
 
   if (error !== null) {
     return transientOrAdopt(table, entry, error);

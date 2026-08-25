@@ -1,4 +1,4 @@
-import type { PostgrestError } from '@supabase/supabase-js';
+import { PostgrestError } from '@supabase/supabase-js';
 
 /**
  * Shared, controllable mock of `src/lib/supabase.ts` for sync-engine specs.
@@ -192,39 +192,43 @@ async function dispatch(
     ...(terminal === 'list' ? { gte: pending.gte ?? null } : {}),
   });
 
-  const responder =
-    terminal === 'upsert'
-      ? h.responder.upsert
-      : terminal === 'delete'
-        ? h.responder.delete
-        : terminal === 'single'
-          ? h.responder.single
-          : h.responder.list;
-
-  if (responder === undefined) {
-    return {
-      data: null,
-      error: errorWithMessage(
-        `mock-supabase: no "${terminal}" responder registered for "${table}".`,
-      ),
-    };
-  }
+  // Each case reads its own responder slot so the parameter types stay
+  // disjoint — a shared union of the four responder signatures would
+  // collapse call arguments to their intersection.
+  const missing = (): QueryResponse => ({
+    data: null,
+    error: errorWithMessage(
+      `mock-supabase: no "${terminal}" responder registered for "${table}".`,
+    ),
+  });
 
   switch (terminal) {
-    case 'upsert':
-      return responder(table, pending.payload as Record<string, unknown>);
-    case 'delete':
-      return responder(table, String(pending.id));
-    case 'single':
-      return responder(table, String(pending.id));
-    case 'list':
-      return responder(table, pending.gte ?? null);
+    case 'upsert': {
+      const respond = h.responder.upsert;
+      return respond === undefined
+        ? missing()
+        : respond(table, pending.payload as Record<string, unknown>);
+    }
+    case 'delete': {
+      const respond = h.responder.delete;
+      return respond === undefined ? missing() : respond(table, String(pending.id));
+    }
+    case 'single': {
+      const respond = h.responder.single;
+      return respond === undefined ? missing() : respond(table, String(pending.id));
+    }
+    case 'list': {
+      const respond = h.responder.list;
+      return respond === undefined ? missing() : respond(table, pending.gte ?? null);
+    }
   }
 }
 
 /** Build a PostgrestError-shaped failure for responders. */
 export function makeError(code: string, message: string): PostgrestError {
-  return { code, details: null, hint: null, message };
+  // The real class (exported as a value since postgrest-js made its fields
+  // non-nullable); empty strings stand in for "no details / no hint".
+  return new PostgrestError({ code, details: '', hint: '', message });
 }
 
 /** Convenience wrapper for responder errors that only need a message. */

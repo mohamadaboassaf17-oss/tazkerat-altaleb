@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto';
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { LocalCategory, LocalNote } from '../types/models';
+import type { LocalCategory, CloudBook, LocalNote } from '../types/models';
 import { db } from './db';
 import {
   BASE_BACKOFF_MS,
@@ -71,7 +71,7 @@ function notePayload(version = 4): Record<string, unknown> {
 }
 
 /** Cloud-shaped book payload used to test multi-entry passes. */
-const BOOK_PAYLOAD: Record<string, unknown> = {
+const BOOK_PAYLOAD = {
   id: 'book_1',
   user_id: 'u_1',
   category_id: 'cat_1',
@@ -82,7 +82,7 @@ const BOOK_PAYLOAD: Record<string, unknown> = {
   created_at: NOW,
   updated_at: NOW,
   version: 1,
-};
+} satisfies CloudBook;
 
 async function seedLocalRow(row: LocalCategory): Promise<void> {
   await db.categories.put(row);
@@ -304,7 +304,7 @@ describe('pushOutbox — transient failures', () => {
     await seedLocalRow(localCategory());
     await queueInsert(categoryPayload());
     await db.books.put({
-      ...(BOOK_PAYLOAD as unknown as LocalCategory),
+      ...BOOK_PAYLOAD,
       dirty: true,
       server_version: 0,
     });

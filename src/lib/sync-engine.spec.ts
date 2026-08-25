@@ -100,20 +100,21 @@ describe('runSyncCycle — single flight', () => {
         ? { data: null, error: makeError('XX000', 'pull exploded') }
         : { data: [], error: null };
 
-    let latest: SyncStatus | null = null;
+    const statuses: SyncStatus[] = [];
     const unsubscribe = subscribeSyncStatus((status) => {
-      latest = status;
+      statuses.push(status);
     });
 
     try {
       await expect(runSyncCycle()).resolves.toBeUndefined();
-      expect(latest?.state).toBe('error');
-      if (latest?.state !== 'error') throw new Error('spec bug: expected error state.');
-      expect(latest.lastError).toContain('pull exploded');
+      const finalStatus = statuses.at(-1);
+      expect(finalStatus?.state).toBe('error');
+      if (finalStatus?.state !== 'error') throw new Error('spec bug: expected error state.');
+      expect(finalStatus.lastError).toContain('pull exploded');
 
       h.responder.list = () => ({ data: [], error: null });
       await runSyncCycle();
-      expect(latest?.state).toBe('idle'); // recovers on the next cycle
+      expect(statuses.at(-1)?.state).toBe('idle'); // recovers on the next cycle
     } finally {
       unsubscribe();
     }
@@ -130,15 +131,15 @@ describe('runSyncCycle — offline → edit → online', () => {
     });
     expect(await db.outbox.count()).toBe(1);
 
-    let latest: SyncStatus | null = null;
+    const statuses: SyncStatus[] = [];
     const unsubscribe = subscribeSyncStatus((status) => {
-      latest = status;
+      statuses.push(status);
     });
 
     try {
       await runSyncCycle(); // offline pass touches nothing remote
       expect(h.calls).toHaveLength(0);
-      expect(latest?.state).toBe('idle');
+      expect(statuses.at(-1)?.state).toBe('idle');
 
       h.session = { user: { id: 'u_1' } };
       h.responder.list = () => ({ data: [], error: null }); // pull sees nothing new
@@ -152,8 +153,8 @@ describe('runSyncCycle — offline → edit → online', () => {
       expect(await db.outbox.count()).toBe(0);
       const stored = await db.categories.limit(1).first();
       expect(stored?.dirty).toBe(false);
-      expect(latest?.state).toBe('idle');
-      expect(latest?.pendingCount).toBe(0);
+      expect(statuses.at(-1)?.state).toBe('idle');
+      expect(statuses.at(-1)?.pendingCount).toBe(0);
     } finally {
       unsubscribe();
     }

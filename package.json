@@ -10,7 +10,7 @@
     "icons": "node scripts/generate-icons.mjs",
     "glyphs": "node scripts/check-glyphs.mjs",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "typecheck": "tsc -b",
     "test": "vitest run"
   },
   "dependencies": {
