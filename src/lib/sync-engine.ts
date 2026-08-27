@@ -61,6 +61,13 @@ async function executeCycle(): Promise<void> {
     }
 
     await pullChanges(data.session.user.id);
+    // Retry any pending Storage blobs queued during offline media creates (M7).
+    try {
+      const { retryPendingUploads } = await import('./media-crud');
+      await retryPendingUploads();
+    } catch {
+      // best-effort; never fails the cycle
+    }
     await pushOutbox();
 
     notify({ state: 'idle', pendingCount: await db.outbox.count() });

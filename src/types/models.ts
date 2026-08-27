@@ -110,7 +110,17 @@ export interface CloudNote {
   type: NoteType;
   /** Next SRS review due date (ISO date). */
   review_date: string;
+  /** SM-2 ease factor (AGENTS.md SRS, PRD §5.2); default 2.5, floor 1.3. */
+  ease_factor: number;
+  /** Current interval in days between reviews; default 0. */
+  interval_days: number;
+  /** Consecutive successful repetitions; default 0, reset on صعب. */
+  repetitions: number;
   is_public: boolean;
+  /** Arabic-normalized title for search (M9 generated STORED on cloud, JS-stamped locally). Absent on pre-M9 rows. */
+  title_norm?: string;
+  /** Arabic-normalized content for search (M9 generated STORED on cloud, JS-stamped locally). Absent on pre-M9 rows. */
+  content_norm?: string;
   created_at: string;
   updated_at: string;
   version: number;
@@ -139,8 +149,10 @@ export interface CloudMedia {
   note_id: string | null;
   lecture_id: string | null;
   type: MediaType;
-  /** File URL in Supabase Storage. */
+  /** File path in Supabase Storage: `<uid>/<media_id>.<ext>` inside `media-images` or `media-audio`. */
   url: string;
+  /** For audio only: duration in seconds (1..300), NULL for images. */
+  duration_seconds: number | null;
   created_at: string;
   updated_at: string;
   version: number;

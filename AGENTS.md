@@ -9,6 +9,7 @@ Greenfield PWA SaaS for Islamic-studies students. Read `tazkerat-altaleb-prd.md`
 - **Dexie.js** over IndexedDB for local persistence. Reads/writes hit local first; cloud sync is async.
 - **Service Worker** is mandatory — required for install prompt on iOS Safari and Android Chrome and for the offline shell.
 - No payment provider in MVP. The only monetized path is Pro media storage (post-MVP).
+- **M10 hardening:** route-based code-splitting (`React.lazy` + `Suspense` + `manualChunks` vendor-graph/dexie/supabase/router), VirtualList windowing after 30 items, Supabase-only observability (`analytics_events`/`error_reports`, no external service) — all respect the Supabase-only constraint.
 
 ## Domain hierarchy (enforce at the DB, not just in app code)
 
@@ -63,6 +64,21 @@ Two XOR rules — implement as `CHECK` constraints or triggers, not as UI guards
 
 - Google OAuth + Email/Password only, both via Supabase Auth. No third-party identity provider.
 - Email verification is required for the password flow. "Forgot password" uses Supabase's built-in.
+
+## Install prompt
+
+- Custom `useInstallPrompt` + `InstallPrompt` banner: second-visit gate (`install_prompt_visits >=2`), dismissable 7-day TTL, hidden in `display-mode: standalone`, respects `navigator.doNotTrack`.
+- Android/desktop: stores `beforeinstallprompt` event, calls `prompt()` programmatically. iOS: manual A2HS instructions (share → Add to Home Screen). No external dependency.
+
+## Observability (Supabase-only)
+
+- No Sentry/PostHog in MVP. `analytics_events (user_id, event, props, created_at)` and `error_reports (user_id, message, stack, context)` are Supabase tables with RLS `authenticated` own-row write/read. `initAnalytics()` batches 10 or 30s + visibilitychange/online; `initErrorReporting()` captures `window.onerror`/`unhandledrejection`. Respects `doNotTrack`. Retention is query-layer (`created_at > now()-30d`).
+
+## Performance / A11y
+
+- Routes are `React.lazy` behind `Suspense` at `src/App.tsx:22-42`; `vite.config.ts` isolates `vendor-graph` (react-force-graph-2d/d3) + vendor-dexie/supabase/router; `chunkSizeWarningLimit: 600`.
+- Lists >30 items use `src/components/virtual-list.tsx` windowing (fixed `estimateSize` per row, overscan 5, `maxHeight 60vh` scroll container) — keeps 60 fps at 200+ items. Short lists render plain `<ul>`.
+- `eslint-plugin-jsx-a11y` enforced; dialogs trap focus + ESC + overlay-click; graph canvas has accessible fallback; all buttons have `focus-visible:ring-2`.
 
 ## Dashboard
 

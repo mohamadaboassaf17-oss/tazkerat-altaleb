@@ -69,9 +69,39 @@ async function main() {
   await writeFile(path.join(OUT_DIR, 'favicon.svg'), appIconSvg(mark));
   console.log(`wrote ${path.join(OUT_DIR, 'favicon.svg')}`);
 
-  await writeIcon('pwa-192.png', appIconSvg(mark).replace(`width="${SIZE}" height="${SIZE}"`, `width="192" height="192"`).replace(`viewBox="0 0 ${SIZE} ${SIZE}"`, `viewBox="0 0 ${SIZE} ${SIZE}"`), 192);
-  await writeIcon('pwa-512.png', appIconSvg(mark), 512);
+  const sizes = [72, 96, 128, 144, 152, 180, 192, 384, 512];
+  for (const s of sizes) {
+    await writeIcon(`pwa-${s}.png`, appIconSvg(mark).replace(`width="${SIZE}" height="${SIZE}"`, `width="${s}" height="${s}"`), s);
+  }
   await writeIcon('pwa-512-maskable.png', maskableSvg(differs ? LETTER_MARK : BOOKMARK_MARK), 512);
+
+  // Screenshots placeholders (M10 manifest requirement)
+  const screenshotsDir = path.join(OUT_DIR, 'screenshots');
+  await mkdir(screenshotsDir, { recursive: true });
+  async function writeScreenshot(file, w, h) {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><rect width="${w}" height="${h}" fill="${GREEN}"/><text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" font-family="sans-serif" font-size="${Math.round(w / 12)}" font-weight="700" fill="#ffffff">تذكرة الطالب</text></svg>`;
+    const png = await sharp(Buffer.from(svg)).png().toBuffer();
+    await writeFile(path.join(screenshotsDir, file), png);
+    console.log(`wrote screenshots/${file} (${w}x${h})`);
+  }
+  await writeScreenshot('narrow.png', 1080, 1920);
+  await writeScreenshot('wide.png', 1920, 1080);
+
+  // Splash screens for iOS (minimal set)
+  const splashDir = path.join(OUT_DIR, 'splash');
+  await mkdir(splashDir, { recursive: true });
+  const splashSizes = [
+    [1125, 2436],
+    [1170, 2532],
+    [1284, 2778],
+  ];
+  for (const [w, h] of splashSizes) {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><rect width="${w}" height="${h}" fill="${GREEN}"/><text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" font-family="sans-serif" font-size="${Math.round(w / 10)}" font-weight="700" fill="#ffffff">ت</text></svg>`;
+    const png = await sharp(Buffer.from(svg)).png().toBuffer();
+    const name = `splash-${w}x${h}.png`;
+    await writeFile(path.join(splashDir, name), png);
+    console.log(`wrote splash/${name}`);
+  }
 
   // Sanity: confirm the 512 icon actually contains light (white) pixels.
   const { data } = probe;

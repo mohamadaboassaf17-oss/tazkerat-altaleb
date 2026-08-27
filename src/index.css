@@ -22,4 +22,38 @@
     background-color: var(--color-neutral-50);
     color: var(--color-neutral-900);
   }
+  :focus-visible {
+    outline: 2px solid var(--color-brand-600);
+    outline-offset: 2px;
+  }
+  /* Logical focus ring fallbacks */
+  .focus-ring:focus-visible {
+    outline: 2px solid var(--color-brand-600);
+    outline-offset: 2px;
+  }
+}
+
+@media print {
+  header,
+  footer,
+  nav,
+  button {
+    display: none !important;
+  }
+  .printable {
+    display: block !important;
+  }
+  @page {
+    margin: 1.5cm;
+  }
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  .print-content {
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-size: 12pt;
+    line-height: 1.7;
+  }
 }

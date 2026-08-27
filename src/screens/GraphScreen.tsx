@@ -1,6 +1,9 @@
-import type { ReactElement } from 'react';
+import { lazy, Suspense, type ReactElement } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { KnowledgeGraph } from '../components/knowledge-graph';
+
+const KnowledgeGraph = lazy(() =>
+  import('../components/knowledge-graph').then((m) => ({ default: m.KnowledgeGraph })),
+);
 
 const BACK_BUTTON_CLASS =
   'rounded-lg border border-neutral-300 px-3 py-1.5 text-sm text-neutral-700 transition-colors hover:bg-neutral-100';
@@ -24,7 +27,15 @@ export default function GraphScreen(): ReactElement {
       </div>
       <p className="text-sm text-neutral-500">انقر على عقدة لفتح الملاحظة.</p>
       <div className="min-h-[420px] flex-1">
-        <KnowledgeGraph />
+        <Suspense
+          fallback={
+            <p className="py-10 text-center text-sm text-neutral-500" role="status">
+              جارٍ تحميل الخريطة…
+            </p>
+          }
+        >
+          <KnowledgeGraph />
+        </Suspense>
       </div>
     </div>
   );

@@ -10,3 +10,8 @@ supabase/.temp
 .DS_Store
 *.log
 index_out.html
+
+.playwright-mcp/
+
+/*.png
+

@@ -9,7 +9,7 @@ import {
   type MouseEvent,
   type ReactElement,
 } from 'react';
-import { stripTashkeel } from '../lib/arabic-text';
+import { normalizeArabic, stripTashkeel } from '../lib/arabic-text';
 import { db } from '../lib/db';
 import type { LocalNote } from '../types/models';
 
@@ -87,9 +87,12 @@ export function WikiAutocomplete({
     if (query === null) {
       return [];
     }
-    const needle = stripTashkeel(query).toLowerCase();
+    const needle = normalizeArabic(query);
     return candidates
-      .filter((note) => stripTashkeel(note.title).toLowerCase().includes(needle))
+      .filter((note) => {
+        const t = typeof note.title_norm === 'string' ? note.title_norm : normalizeArabic(note.title);
+        return t.includes(needle);
+      })
       .sort((a, b) => a.title.localeCompare(b.title, 'ar'))
       .slice(0, MAX_SUGGESTIONS);
   }, [candidates, query]);
@@ -189,6 +192,8 @@ export function WikiAutocomplete({
         dir="rtl"
         disabled={disabled}
         id={id}
+        // combobox role is needed for aria-expanded/listbox pattern; textarea is the combobox
+        role="combobox"
         onBlur={() => setQuery(null)}
         onChange={handleChange}
         onClick={syncQueryFromDom}

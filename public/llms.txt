@@ -1,0 +1,4 @@
+# تذكرة الطالب — Tazkerat Altaleb
+# PWA for Islamic-studies students: categories → books → lecturers → lectures, notes with [[wiki-links]], knowledge graph, SRS review.
+# All core features are free forever; media trial 30 days from first upload.
+# Public share path: /share/:noteId (is_public = true). Offline-first via IndexedDB/Dexie.js + Supabase sync.

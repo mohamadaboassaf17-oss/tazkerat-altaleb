@@ -1,5 +1,6 @@
 import reactHooks from 'eslint-plugin-react-hooks';
 import reactRefresh from 'eslint-plugin-react-refresh';
+import jsxA11y from 'eslint-plugin-jsx-a11y';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
@@ -7,7 +8,11 @@ export default tseslint.config(
   { ignores: ['dist', 'supabase', 'node_modules'] },
   {
     files: ['**/*.{ts,tsx}'],
-    extends: [...tseslint.configs.recommendedTypeChecked, reactHooks.configs.recommended],
+    extends: [
+      ...tseslint.configs.recommendedTypeChecked,
+      reactHooks.configs.recommended,
+      jsxA11y.flatConfigs.recommended,
+    ],
     languageOptions: {
       ecmaVersion: 2022,
       globals: globals.browser,
@@ -21,6 +26,7 @@ export default tseslint.config(
     },
     rules: {
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
+      'jsx-a11y/no-autofocus': 'warn',
     },
   },
 );

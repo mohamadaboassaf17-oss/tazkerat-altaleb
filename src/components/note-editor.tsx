@@ -26,11 +26,13 @@ const EMPTY_CONTENT_ERROR = 'لا يمكن حفظ ملاحظة فارغة.';
 export interface NoteDraft {
   content: string;
   type: NoteType;
+  is_public: boolean;
 }
 
 interface NoteEditorProps {
   initialContent: string;
   initialType: NoteType;
+  initialIsPublic?: boolean;
   isSaving: boolean;
   saveError: string | null;
   submitLabel: string;
@@ -41,6 +43,7 @@ interface NoteEditorProps {
 export function NoteEditor({
   initialContent,
   initialType,
+  initialIsPublic = false,
   isSaving,
   saveError,
   submitLabel,
@@ -50,6 +53,7 @@ export function NoteEditor({
   const contentFieldId = useId();
   const [content, setContent] = useState(initialContent);
   const [type, setType] = useState<NoteType>(initialType);
+  const [isPublic, setIsPublic] = useState(initialIsPublic);
   const [validationError, setValidationError] = useState<string | null>(null);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>): void {
@@ -59,7 +63,7 @@ export function NoteEditor({
       return;
     }
     setValidationError(null);
-    onSave({ content, type });
+    onSave({ content, type, is_public: isPublic });
   }
 
   return (
@@ -94,6 +98,20 @@ export function NoteEditor({
           {extractTitle(content)}
         </p>
       </div>
+
+      <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-neutral-200 bg-white px-3 py-2.5">
+        <span className="flex flex-col text-start">
+          <span className="text-sm font-medium text-neutral-800">مشاركة عامة</span>
+          <span className="text-xs text-neutral-500">عند التفعيل يمكن لأي شخص لديه الرابط قراءة هذه الملاحظة</span>
+        </span>
+        <input
+          aria-label="مشاركة عامة"
+          checked={isPublic}
+          className="h-5 w-10 appearance-none rounded-full bg-neutral-300 p-0.5 transition-colors checked:bg-brand-600 [&::-webkit-slider-thumb]:appearance-none"
+          onChange={(event) => setIsPublic(event.target.checked)}
+          type="checkbox"
+        />
+      </label>
 
       <div className="flex flex-col gap-1.5">
         <label className="text-sm font-medium text-neutral-700" htmlFor={contentFieldId}>

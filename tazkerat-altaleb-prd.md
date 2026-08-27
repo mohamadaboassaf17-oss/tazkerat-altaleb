@@ -194,7 +194,12 @@
 | `content` | text | المحتوى الكامل (يدعم روابط `[[`) |
 | `type` | enum | فائدة / قاعدة / سؤال / تعقيب / حفظ |
 | `review_date` | date | تاريخ المراجعة التالية (SRS) |
+| `ease_factor` | double precision (default 2.5) | معامل السهولة SM-2 |
+| `interval_days` | int (default 0) | الفاصل بالأيام |
+| `repetitions` | int (default 0) | عدد التكرارات الناجحة |
 | `is_public` | boolean (default false) | لإتاحة المشاركة العامة |
+| `title_norm` | text (generated STORED) | تطبيع عربي للعنوان: بلا تشكيل، همز موحّد، بلا ال/و/ف/ب — للبحث (M9) |
+| `content_norm` | text (generated STORED) | تطبيع عربي للمحتوى بنفس القاعدة — للبحث (M9) |
 | `version` | int (default 1) | رقم النسخة لحل التعارض |
 
 > **قاعدة:** `book_id` و`lecture_id` لا يمكن أن يكونا مملوءَين معاً — واحد فقط أو لا شيء.
@@ -216,7 +221,8 @@
 | `note_id` | uuid (FK, nullable) | مرتبط بملاحظة |
 | `lecture_id` | uuid (FK, nullable) | مرتبط بمحاضرة |
 | `type` | enum | `audio` / `image` |
-| `url` | text | رابط الملف في Supabase Storage |
+| `url` | text | رابط الملف في Supabase Storage (المسار `<uid>/<media_id>.<ext>` داخل `media-images` أو `media-audio`) |
+| `duration_seconds` | int (nullable) | للـ audio فقط: 1..300 (5 دقائق) — NULL للصور |
 | `created_at` | timestamptz | |
 
 > **قاعدة:** `note_id` و`lecture_id` لا يمكن أن يكونا مملوءَين معاً.
@@ -229,6 +235,25 @@
 | `display_name` | text | الاسم الظاهر |
 | `created_at` | timestamptz | وقت التسجيل |
 | `media_trial_started_at` | timestamptz (nullable) | تاريخ أول رفع وسائط |
+
+### 7.9. جدول `analytics_events` (M10 — Supabase-only)
+| الحقل | النوع | الوصف |
+|-------|-------|-------|
+| `id` | uuid (PK) | |
+| `user_id` | uuid (FK) | مالك الحدث |
+| `event` | text | اسم الحدث (page_view, note_created …) |
+| `props` | jsonb | خصائص إضافية |
+| `created_at` | timestamptz | |
+
+### 7.10. جدول `error_reports` (M10 — Supabase-only)
+| الحقل | النوع | الوصف |
+|-------|-------|-------|
+| `id` | uuid (PK) | |
+| `user_id` | uuid (FK, nullable) | قد يكون null لـ anon |
+| `message` | text | نص الخطأ |
+| `stack` | text (nullable) | |
+| `context` | jsonb | href/userAgent/extra |
+| `created_at` | timestamptz | |
 
 ---
 

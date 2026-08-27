@@ -64,48 +64,58 @@
 
 ## M6 — SRS
 
-- [ ] Implement SM-2-inspired scheduler (ease_factor, interval, repetitions, review_date) for three ratings: سهل / متوسط / صعب
-- [ ] Card mode UI: show one note, wait for rating, then advance — no peek-ahead
-- [ ] Build "today" queue query: `review_date <= today`, sorted by `حفظ` priority first, then due date
-- [ ] Apply rating → update `review_date`, `ease_factor`, `interval`, `repetitions`
-- [ ] Unit tests: scheduler math (e.g., سهل on first review = +1 day, +1 day, +6 days pattern)
-- [ ] Test: a `حفظ` note due today surfaces before a same-difficulty `فائدة` note
+- [x] Implement SM-2-inspired scheduler (ease_factor, interval, repetitions, review_date) for three ratings: سهل / متوسط / صعب
+- [x] Card mode UI: show one note, wait for rating, then advance — no peek-ahead
+- [x] Build "today" queue query: `review_date <= today`, sorted by `حفظ` priority first, then due date
+- [x] Apply rating → update `review_date`, `ease_factor`, `interval`, `repetitions`
+- [x] Unit tests: scheduler math (e.g., سهل on first review = +1 day, +1 day, +6 days pattern)
+- [x] Test: a `حفظ` note due today surfaces before a same-difficulty `فائدة` note
+
+> ✅ Implemented (2026-08-26): SQL migration `20260826000001_m6_srs_scheduler` (+revert) adds `ease_factor double precision DEFAULT 2.5 CHECK >=1.3`, `interval_days int DEFAULT 0`, `repetitions int DEFAULT 0` + index `idx_notes_user_review_type (user_id, review_date, note_type)`; PRD §7.5 extended; Dexie bump to v2 (`src/lib/db.ts:55`) + `CloudNote` fields (`src/types/models.ts:112`). Scheduler pure lib `src/lib/srs.ts` (nextReview ladder 1/6/round(prev*ease), ease ±0.15/−0.20 floored 1.3, حفظ boost ceil(*1.15), addDays UTC, compareDueNotes حفظ-first, buildTodayQueue) + `src/lib/srs-queue.ts` Dexie helper `getDueNotes/countDueNotes`. Mutation `rateNote` in `src/lib/note-crud.ts:164` (coalesce v1 rows, bumpVersion, queueOutbox in one tx, version-guarded). UI `src/screens/ReviewScreen.tsx` on `/review` (card mode, 3 buttons صعب/متوسط/سهل, keyboard 1/2/3, no peek-ahead, empty/done states) wired in `src/App.tsx:71`; Dashboard slice shows due count + CTA. Tests: `srs.spec.ts` (13) + `srs-queue.spec.ts` (2) + `srs-rate.spec.ts` (3) → suite 131/13 files, typecheck + lint + glyphs + build green (825kB chunk pre-existing, deferred to M10).
 
 ## M7 — Media & Freeze Policy
 
-- [ ] Create Supabase Storage buckets for audio and image, with 5-min audio cap
-- [ ] On first successful upload, set `users.media_trial_started_at = now()` if null
-- [ ] RLS policy on `media` insert: allow only if `now() - media_trial_started_at < 30 days` (or null, meaning first upload)
-- [ ] Storage policy: new uploads blocked at 30-day boundary
-- [ ] Freeze existing media after 30 days: read-only (still downloadable, still renderable), no replace/delete
-- [ ] UI: trial countdown in settings, hide upload control after freeze, "Upgrade to Pro" placeholder (no payment flow in MVP)
-- [ ] Test: simulate `media_trial_started_at` = 31 days ago → insert blocked, existing media still served
+- [x] Create Supabase Storage buckets for audio and image, with 5-min audio cap
+- [x] On first successful upload, set `users.media_trial_started_at = now()` if null
+- [x] RLS policy on `media` insert: allow only if `now() - media_trial_started_at < 30 days` (or null, meaning first upload)
+- [x] Storage policy: new uploads blocked at 30-day boundary
+- [x] Freeze existing media after 30 days: read-only (still downloadable, still renderable), no replace/delete
+- [x] UI: trial countdown in settings, hide upload control after freeze, "Upgrade to Pro" placeholder (no payment flow in MVP)
+- [x] Test: simulate `media_trial_started_at` = 31 days ago → insert blocked, existing media still served
+
+> ✅ Implemented (2026-08-27): DB migration `20260827000001_m7_media_storage.sql` (+revert) adds `media.duration_seconds int CHECK 1..300` nullable, trigger `set_media_trial_started_at()` (SECURITY DEFINER, BEFORE INSERT ON media, stamps `users.media_trial_started_at` on first upload), helper `media_trial_is_open()` (now()-started < 30d or null), buckets `media-images` + `media-audio` (private, 10 MiB, mime allow-lists), RLS on `public.media` (select always, insert/update/delete gated by `media_trial_is_open()` + parent ownership via notes/lectures→lecturers→books), Storage RLS on `storage.objects` (insert/update/delete gated by trial + `foldername(name)[1]=auth.uid()`, select always for own objects). PRD §7.7 extended with `duration_seconds`. Local layer: `src/types/models.ts:142` + `src/lib/db.ts:82` Dexie v3 (`media` + `pending_media_uploads`), `src/lib/media.ts` (bucketForKind, validateFileForKind, validateAudioDuration ≤300s, trial math `isTrialOpen/isExpired/trialDaysRemaining/trialCountdownLabel`), `src/lib/media-crud.ts` (createMedia: file/mime/size + duration check, XOR via xor-guards, Storage upload to `<uid>/<mediaId>.<ext>`, pending blob queue on offline, local row `version=1/dirty=true` + outbox in one tx, optimistic local trial stamp + best-effort cloud `users` update; deleteMedia/updateMedia blocked after expiry; retryPendingUploads; getMediaDownloadUrl). Sync: `sync-serialize` passthrough for `duration_seconds`, `sync-engine` retries pending blobs after pull. UI: `src/hooks/useMediaTrial.ts`, `src/components/media-uploader.tsx` (hidden after freeze, shows `Upgrade to Pro (قريبًا)` placeholder), `src/components/media-gallery.tsx` (image <img>/audio <audio>, signed URL, download link, delete gated, read-only badge after freeze), `src/screens/SettingsScreen.tsx` on `/settings`, `NoteEditorScreen` media section (when editing), `LecturesScreen` expandable per-lecture media, `DashboardScreen` trial badge + link to settings, `src/App.tsx:71` route. Tests: `src/lib/media.spec.ts` (14) + `src/lib/media-crud.spec.ts` (8) — full suite 153/15 passing, typecheck + lint clean, glyphs PASS, build OK (843kB pre-existing chunk, deferred to M10). Pending cloud push (migration repo-only until `supabase db push`).
 
 ## M8 — Sharing & Export
 
-- [ ] `is_public` toggle in note editor
-- [ ] `/share/note_id` route: renders the note (and its outbound `[[]]` resolved) for `anon` users
-- [ ] RLS policy for `anon` role on `notes`: select allowed only when `is_public = true`
-- [ ] RLS policy for `anon` on `note_links`: select allowed only when the source note is public
-- [ ] Markdown export: `notes.content` with `[[id]]` → `[[title]]`, one note or a whole category, downloaded as `.md`
-- [ ] PDF export: `window.print()` with a dedicated print stylesheet, one note or a whole category
-- [ ] Test: anon can read a public note, cannot read a private one, `[[]]` resolves to current titles
+- [x] `is_public` toggle in note editor
+- [x] `/share/note_id` route: renders the note (and its outbound `[[]]` resolved) for `anon` users
+- [x] RLS policy for `anon` role on `notes`: select allowed only when `is_public = true`
+- [x] RLS policy for `anon` on `note_links`: select allowed only when the source note is public
+- [x] Markdown export: `notes.content` with `[[id]]` → `[[title]]`, one note or a whole category, downloaded as `.md`
+- [x] PDF export: `window.print()` with a dedicated print stylesheet, one note or a whole category
+- [x] Test: anon can read a public note, cannot read a private one, `[[]]` resolves to current titles
+
+> ✅ Implemented (2026-08-27): DB migration `20260828000001_m8_sharing_anon.sql` (+revert) adds `notes_select_public_anon FOR SELECT TO anon USING (is_public=true)` + `note_links_select_public_anon FOR SELECT TO anon USING (EXISTS notes WHERE id=source_note_id AND is_public=true)` (docs updated in `docs/supabase-setup.md` §4/§7.7). Toggle: `src/components/note-editor.tsx:26` `NoteDraft.is_public` + checkbox “مشاركة عامة” + `src/screens/NoteEditorScreen.tsx:168` wiring `updateNote(..., is_public)` (create path stamps then second update if toggled on) + share-link box copy ` /share/${id}` when `is_public`. Share route: new `src/screens/ShareNoteScreen.tsx` (anon fetch via `supabase.from('notes').select(...).eq('id',...).single()` gated by new RLS, resolves outbound `[[id|display]]`→`[[title]]` via second anon query filtered to public targets else fallback display, 404 for private). `src/App.tsx:53` public route `/share/:noteId` outside `ProtectedRoute`. Export: new `src/lib/export.ts` (`rewriteWikiLinksToTitles`, `collectWikiLinkIds`, `buildTitleMap`, `markdownForNote`, `exportSingleNoteMarkdown`, `exportCategoryMarkdown` aggregating books→lecturers→lectures→notes with `[[title]]` rewrite, `downloadTextFile`, `sanitizeFilename`) + `src/lib/export.spec.ts` (9 tests); UI: `NoteEditorScreen` single-note “تصدير Markdown” (Blob `.md`) + “تصدير PDF / طباعة” (`window.print()`), `CategoriesScreen` per-category “تصدير” (category markdown); print stylesheet `@media print` in `src/index.css:27`. Typecheck/lint/tests/build green (16 files, 162 tests).
 
 ## M9 — Dashboard & Search
 
-- [ ] Dashboard layout: progress stats, local knowledge map, today's review list, recent 5
-- [ ] Local knowledge map centered on book with most recent `last_opened_at` (its subtree only), button to open full graph
-- [ ] "Recent 5" = 5 most recent notes by `created_at`
-- [ ] Search box with Arabic normalization: strip tashkeel → normalize hamza family → drop ال / و / ف / ب
-- [ ] Add generated/stored `title_norm` and `content_norm` columns; normalize on write or read consistently
-- [ ] Test: search `العقيدة` matches `عقيدة`, `بالعقيدة`, `العقيدةَ` (tashkeel variants)
+- [x] Dashboard layout: progress stats, local knowledge map, today's review list, recent 5
+- [x] Local knowledge map centered on book with most recent `last_opened_at` (its subtree only), button to open full graph
+- [x] "Recent 5" = 5 most recent notes by `created_at`
+- [x] Search box with Arabic normalization: strip tashkeel → normalize hamza family → drop ال / و / ف / ب
+- [x] Add generated/stored `title_norm` and `content_norm` columns; normalize on write or read consistently
+- [x] Test: search `العقيدة` matches `عقيدة`, `بالعقيدة`, `العقيدةَ` (tashkeel variants)
+
+> ✅ Implemented (M9): DB migration `20260829000001_m9_dashboard_search.sql` (+revert) adds `normalize_ar(text) IMMUTABLE` (strip tashkeel U+064B–U+065F+U+0670 → hamza family أإآٱ→ا → drop ال/و/ف/ب guarded len≥5/rem≥3) + `notes.title_norm/content_norm GENERATED ALWAYS AS (normalize_ar(col)) STORED` + `pg_trgm` GIN `idx_notes_title_norm_trgm/content_norm` + btree `idx_notes_user_title_norm/content_norm`; PRD §7.5 updated. Dexie v4 `src/lib/db.ts:111` (`notes` now `title_norm,content_norm` + upgrade backfill via `normalizeArabic`) + `src/types/models.ts:112` optional `title_norm/content_norm` on `CloudNote`. Serializer `src/lib/sync-serialize.ts` strips generated columns on push; `src/lib/note-crud.ts` stamps `title_norm/content_norm = normalizeArabic(title/content)` on create/update (outbox payload stripped). Lib `src/lib/arabic-text.ts` now `normalizeHamza/stripArabicPrefixes/normalizeArabic` (tashkeel→hamza→ال/و/ف/ب per token, guard preserves وليد/بدر/فهد); shared via `graph-data.ts` extracted builder `buildGraphData(scope)` reused by `KnowledgeGraph(scope,compact)`. Dashboard `src/lib/dashboard-queries.ts` (`getProgressByCategory` per-category lectures is_completed/total pct, `getRecentNotes(5)` by created_at DESC, `getTodayQueue` via `getDueNotes` حفظ-first) + `src/screens/DashboardScreen.tsx` rewritten to 4 sections (progress cards, today's queue حفظ-first slice 5 + CTA, recent 5 links, local map `scope=cluster` compact 300px + button to /graph). Search `src/lib/search.ts` (`searchNotesLocal` via `title_norm/content_norm` fallback) + `src/components/search-box.tsx` debounced in `src/App.tsx` header + `src/screens/SearchScreen.tsx` `/search?q=` + `wiki-autocomplete.tsx` now uses `normalizeArabic` (title_norm aware). Tests: `search.spec.ts` (9) proves العقيدة/عقيدة/بالعقيدة/العقيدةَ all hit same note + hamza + anti-overstrip وليد, `dashboard-queries.spec.ts` (5) proves progress pct, recent 5 order, حفظ-first, norm stamping — suite 18 files 176 tests, typecheck+lint+build green.
 
 ## M10 — Production Hardening
 
-- [ ] Verify all migrations are idempotent and reversible (`supabase migration up` / `down`)
-- [ ] Accessibility pass: keyboard nav, focus rings, ARIA, RTL screen reader behavior
-- [ ] Install prompt: trigger on second visit, dismissable, custom A2HS UI for both iOS and Android
-- [ ] PWA manifest: full icon set, theme color, splash screens
-- [ ] Performance: lazy-load graph, virtualize long note lists, code-split routes
-- [ ] Error reporting and basic analytics wired up
-- [ ] Update `README.md` and reconcile `AGENTS.md` with the final stack choices
+- [x] Verify all migrations are idempotent and reversible (`supabase migration up` / `down`)
+- [x] Accessibility pass: keyboard nav, focus rings, ARIA, RTL screen reader behavior
+- [x] Install prompt: trigger on second visit, dismissable, custom A2HS UI for both iOS and Android
+- [x] PWA manifest: full icon set, theme color, splash screens
+- [x] Performance: lazy-load graph, virtualize long note lists, code-split routes
+- [x] Error reporting and basic analytics wired up
+- [x] Update `README.md` and reconcile `AGENTS.md` with the final stack choices
+
+> ✅ Implemented (M10 — 2026-08-27): Verified all 10 migrations (+reverts) are `IF NOT EXISTS`/`IF EXISTS` idempotent and `DROP` reverse-FK ordered — headers claim re-runnable, down scripts guard every object. **Performance:** `src/App.tsx:22-42` route-based `React.lazy` + `Suspense` (+ `src/screens/GraphScreen.tsx` nested lazy for graph), `vite.config.ts` `manualChunks` isolates `vendor-graph` (186kB), `vendor-supabase` (216kB), `vendor-dexie` (96kB), `vendor-router` (49kB); main `index` falls 860kB → 221kB gzip 69kB, no >500kB warning. Lists >30 items use `src/components/virtual-list.tsx` windowing (fixed estimateSize, overscan 5, `maxHeight 60vh`) applied to Categories/Books/Lecturers(note+book)/Lectures/Search — short lists stay plain `<ul>`. **PWA:** `vite.config.ts` manifest now `id:/`, `orientation:any`, `display_override`, `shortcuts` (review/graph), `screenshots` + full icon set 72–512 + maskable, Workbox `runtimeCaching` (media CacheFirst, REST NetworkFirst, `maximumFileSizeToCacheInBytes 3M`); `scripts/generate-icons.mjs` now generates all sizes + screenshots + splash, `public/robots.txt`/`llms.txt`/`sitemap.xml` added + `includeAssets` + `public/splash/`, `index.html:8-12` `apple-touch-icon` 180 + startup images. **Install:** `src/hooks/useInstallPrompt.ts` (visits counter + 7-day dismiss TTL + standalone gate + `beforeinstallprompt` stash + iOS detection) + `src/components/install-prompt.tsx` (bottom sheet, تثبيت/لاحقًا, iOS manual A2HS) mounted in `src/App.tsx:71`. **A11y:** `eslint-plugin-jsx-a11y` added to `eslint.config.js` (flatConfig recommended, no-autofocus warn), dialogs trap focus + ESC + overlay-click + focus rings, `role=combobox` on wiki-autocomplete textarea, `media.has-caption` suppressed for user audio, `src/App.tsx:46` skip-link + banner landmark, `src/index.css` `focus-visible` rings, `src/components/virtual-list.tsx` Home/End keys. **Observability:** `supabase/migrations/20260830000001_m10_observability.sql` (+revert) adds `analytics_events`/`error_reports` with RLS `authenticated` own-row; `src/lib/analytics.ts` (`track`/`initAnalytics` batches 10/30s+visibilitychange/online, respects `doNotTrack`) + `src/lib/error-report.ts` (`captureError`/`initErrorReporting` via `window.onerror`/`unhandledrejection`) wired in `src/main.tsx:11`. **Docs:** new `README.md` comprehensive + `AGENTS.md` reconciled with M10 hardening/perf/install/observability/a11y notes, `docs/supabase-setup.md` + `docs/device-checklist.md` pending host tick. Typecheck+lint+glyphs+build+tests green — suite 176/18.

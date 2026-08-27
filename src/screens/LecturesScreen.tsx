@@ -4,6 +4,9 @@ import { Link, useParams } from 'react-router-dom';
 import { ConfirmDeleteDialog } from '../components/confirm-delete-dialog';
 import { EntityDialog } from '../components/entity-dialog';
 import { FormField } from '../components/form-field';
+import MediaGallery from '../components/media-gallery';
+import MediaUploader from '../components/media-uploader';
+import { VirtualList } from '../components/virtual-list';
 import { useAuth } from '../lib/auth';
 import {
   countLectureChildren,
@@ -45,6 +48,7 @@ export default function LecturesScreen(): ReactElement {
   const [isDeleting, setIsDeleting] = useState(false);
 
   const [noteCounts, setNoteCounts] = useState<Record<string, number>>({});
+  const [expandedMediaLectureId, setExpandedMediaLectureId] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -312,13 +316,16 @@ export default function LecturesScreen(): ReactElement {
           </button>
         </div>
       ) : (
-        <ul className="mt-6 flex flex-col gap-3">
-          {lectures.map((lecture) => (
-            <li className="flex items-center gap-3 rounded-xl bg-white p-4 shadow-sm" key={lecture.id}>
+        <VirtualList
+          items={lectures}
+          estimateSize={84}
+          keyExtractor={(l) => l.id}
+          ariaLabel="قائمة المحاضرات"
+          className="mt-6 flex flex-col gap-3"
+          renderItem={(lecture) => (
+            <div className="flex items-center gap-3 rounded-xl bg-white p-4 shadow-sm">
               <div className="min-w-0 flex-1">
-                <span className="block truncate font-medium text-neutral-900">
-                  {lecture.title}
-                </span>
+                <span className="block truncate font-medium text-neutral-900">{lecture.title}</span>
                 <span className="mt-1 flex items-center gap-2 text-xs text-neutral-500">
                   المدة: {lecture.duration_minutes} دقيقة
                   {lecture.is_completed && (
@@ -329,33 +336,50 @@ export default function LecturesScreen(): ReactElement {
                 </span>
               </div>
               <div className="flex shrink-0 items-center gap-2">
-                <span className="text-xs text-neutral-500">
-                  ملاحظات: {noteCounts[lecture.id] ?? 0}
-                </span>
+                <span className="text-xs text-neutral-500">ملاحظات: {noteCounts[lecture.id] ?? 0}</span>
                 <Link
-                  className="rounded-lg px-2 py-1 text-xs font-medium text-brand-700 transition-colors hover:bg-brand-50"
+                  className="rounded-lg px-2 py-1 text-xs font-medium text-brand-700 transition-colors hover:bg-brand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600"
                   to={`/notes/new?lecture=${lecture.id}`}
                 >
                   + ملاحظة
                 </Link>
+                <button
+                  className="rounded-lg px-2 py-1 text-xs font-medium text-neutral-700 hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600"
+                  type="button"
+                  onClick={() =>
+                    setExpandedMediaLectureId((prev) => (prev === lecture.id ? null : lecture.id))
+                  }
+                >
+                  {expandedMediaLectureId === lecture.id ? 'إخفاء الوسائط' : 'وسائط'}
+                </button>
               </div>
               <button
-                className="shrink-0 rounded-lg px-3 py-1.5 text-sm font-medium text-brand-700 transition-colors hover:bg-brand-50"
+                className="shrink-0 rounded-lg px-3 py-1.5 text-sm font-medium text-brand-700 transition-colors hover:bg-brand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600"
                 onClick={() => openEdit(lecture)}
                 type="button"
               >
                 تعديل
               </button>
               <button
-                className="shrink-0 rounded-lg px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
+                className="shrink-0 rounded-lg px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
                 onClick={() => openDelete(lecture)}
                 type="button"
               >
                 حذف
               </button>
-            </li>
-          ))}
-        </ul>
+            </div>
+          )}
+        />
+      )}
+
+      {expandedMediaLectureId && (
+        <div className="mt-6 rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
+          <h3 className="mb-3 text-sm font-bold text-neutral-800">وسائط المحاضرة</h3>
+          <MediaGallery lectureId={expandedMediaLectureId} />
+          <div className="mt-4">
+            <MediaUploader lectureId={expandedMediaLectureId} />
+          </div>
+        </div>
       )}
 
       {isFormOpen && (

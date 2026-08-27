@@ -10,7 +10,7 @@
 
 **Goal:** one place for progress tracking + smart notes + knowledge map + scheduled review, fully usable offline (PRD §1, §9).
 
-**Current status:** local-first build-out phase. Milestones M1 (foundation/PWA shell/DB schema) ≈95%, M2 (auth UI + onboarding SQL) ≈100%, M3 (content-hierarchy CRUD, version/outbox mutation pipeline, hierarchy RLS), M4 (notes data layer, editor UI, knowledge graph, notes RLS), and M5 (sync engine — conflict-guard migration, serializer, push/pull/engine trio + wiring) are code-complete AND live: all five migrations were pushed to hosted project `pyvskirousshlwsqtoro` on 2026-08-25 (K2 resolved) and the M5/M2 live E2E passed. SRS/media/sharing/dashboard features remain Planned.
+**Current status:** local-first build-out phase. Milestones M1 (foundation/PWA shell/DB schema) ≈95%, M2 (auth UI + onboarding SQL) ≈100%, M3 (content-hierarchy CRUD, version/outbox mutation pipeline, hierarchy RLS), M4 (notes data layer, editor UI, knowledge graph, notes RLS), M5 (sync engine — conflict-guard migration, serializer, push/pull/engine trio + wiring) are code-complete AND live: all five migrations were pushed to hosted project `pyvskirousshlwsqtoro` on 2026-08-25 (K2 resolved) and the M5/M2 live E2E passed. M6 SRS (scheduler + card UI + today queue حفظ-first + rateNote + Dashboard slice) is code-complete repo-only (migration pending push). Media/sharing/export/dashboard-search remain Planned.
 
 **Core tech stack (hard, per AGENTS.md):**
 

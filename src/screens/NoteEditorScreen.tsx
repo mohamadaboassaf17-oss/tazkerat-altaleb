@@ -1,9 +1,12 @@
 import { useEffect, useState, type ReactElement } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ConfirmDeleteDialog } from '../components/confirm-delete-dialog';
+import MediaGallery from '../components/media-gallery';
+import MediaUploader from '../components/media-uploader';
 import { NoteEditor, type NoteDraft } from '../components/note-editor';
 import { useAuth } from '../lib/auth';
 import { db } from '../lib/db';
+import { downloadTextFile, exportSingleNoteMarkdown, sanitizeFilename } from '../lib/export';
 import { createNote, deleteNote, updateNote } from '../lib/note-crud';
 import type { LocalBook, LocalLecture, LocalNote, NoteType } from '../types/models';
 
@@ -163,15 +166,21 @@ export default function NoteEditorScreen(): ReactElement {
     setSaveError(null);
     try {
       if (note !== null) {
-        await updateNote(note, { content: draft.content, type: draft.type });
+        await updateNote(note, { content: draft.content, type: draft.type, is_public: draft.is_public });
       } else if (parent !== null) {
-        await createNote({
+        const newId = await createNote({
           user_id: user.id,
           book_id: parent.kind === 'book' ? parent.row.id : null,
           lecture_id: parent.kind === 'lecture' ? parent.row.id : null,
           content: draft.content,
           type: draft.type,
         });
+        if (draft.is_public) {
+          const created = await db.notes.get(newId);
+          if (created !== undefined) {
+            await updateNote(created, { is_public: true });
+          }
+        }
       } else {
         setSaveError(GENERIC_MUTATION_ERROR);
         return;
@@ -266,6 +275,7 @@ export default function NoteEditorScreen(): ReactElement {
       <NoteEditor
         currentNoteId={currentNoteId}
         initialContent={note?.content ?? ''}
+        initialIsPublic={note?.is_public ?? false}
         initialType={note?.type ?? DEFAULT_NOTE_TYPE}
         isSaving={isSaving}
         key={note?.id ?? 'create'}
@@ -273,6 +283,69 @@ export default function NoteEditorScreen(): ReactElement {
         saveError={saveError}
         submitLabel="حفظ"
       />
+
+      {isEditMode && note !== null && note.is_public && (
+        <div className="mt-6 rounded-lg border border-brand-200 bg-brand-50 px-3 py-3">
+          <p className="text-sm font-medium text-brand-800">رابط المشاركة العامة</p>
+          <div className="mt-2 flex items-center gap-2">
+            <input
+              className="flex-1 rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-sm text-neutral-700"
+              dir="ltr"
+              readOnly
+              value={`${window.location.origin}/share/${note.id}`}
+            />
+            <button
+              className="shrink-0 rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700"
+              onClick={() => {
+                void navigator.clipboard.writeText(`${window.location.origin}/share/${note.id}`);
+              }}
+              type="button"
+            >
+              نسخ
+            </button>
+          </div>
+        </div>
+      )}
+
+      {isEditMode && note !== null && (
+        <div className="mt-6 flex flex-wrap gap-2 print:hidden">
+          <button
+            className="rounded-lg border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+            onClick={() => {
+              void exportSingleNoteMarkdown(note).then((md) => {
+                downloadTextFile(`${sanitizeFilename(note.title)}.md`, md);
+              });
+            }}
+            type="button"
+          >
+            تصدير Markdown
+          </button>
+          <button
+            className="rounded-lg border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+            onClick={() => window.print()}
+            type="button"
+          >
+            تصدير PDF / طباعة
+          </button>
+        </div>
+      )}
+
+      {isEditMode && note !== null && (
+        <div className="printable hidden">
+          <div className="print-content" dir="rtl">
+            <h1 className="text-xl font-bold">{note.title}</h1>
+            <p className="mt-4 whitespace-pre-wrap">{note.content}</p>
+          </div>
+        </div>
+      )}
+
+      {isEditMode && note !== null && (
+        <div className="mt-8 space-y-4">
+          <h3 className="text-lg font-bold text-neutral-800">الوسائط المرتبطة</h3>
+          <MediaGallery noteId={note.id} />
+          <MediaUploader noteId={note.id} />
+        </div>
+      )}
 
       {isDeleteOpen && note !== null && (
         <ConfirmDeleteDialog

@@ -23,6 +23,9 @@ import type { TableName } from '../types/models';
 /** Client-only sync bookkeeping fields that must never leave the device. */
 const CLIENT_ONLY_FIELDS: readonly string[] = ['dirty', 'server_version'];
 
+/** Generated STORED columns that are computed server-side and must not be pushed. */
+const GENERATED_ONLY_FIELDS: readonly string[] = ['title_norm', 'content_norm'];
+
 /**
  * Tables whose local and cloud rows share identical column names — they
  * need only bookkeeping stripped (push) and `server_version` restored
@@ -73,10 +76,13 @@ function resolveMapping(table: TableName): TableMapping {
   );
 }
 
-/** Return a shallow copy with every client-only field removed. */
+/** Return a shallow copy with every client-only / generated field removed. */
 function stripClientOnlyFields(row: Record<string, unknown>): Record<string, unknown> {
   const copy = { ...row };
   for (const field of CLIENT_ONLY_FIELDS) {
+    delete copy[field];
+  }
+  for (const field of GENERATED_ONLY_FIELDS) {
     delete copy[field];
   }
   return copy;

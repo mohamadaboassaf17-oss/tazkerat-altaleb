@@ -14,6 +14,7 @@ import {
 import { parseIntegerInput, validateRequiredText } from '../lib/entity-validation';
 import { db } from '../lib/db';
 import type { LocalBook, LocalCategory } from '../types/models';
+import { VirtualList } from '../components/virtual-list';
 
 const LOAD_ERROR = 'تعذّر تحميل الكتب المحلية.';
 const SESSION_ERROR = 'انتهت الجلسة، أعد تسجيل الدخول.';
@@ -294,37 +295,37 @@ export default function BooksScreen(): ReactElement {
           </button>
         </div>
       ) : (
-        <ul className="mt-6 flex flex-col gap-3">
-          {books.map((book) => (
-            <li
-              className="flex items-center gap-3 rounded-xl bg-white p-4 shadow-sm"
-              key={book.id}
-            >
+        <VirtualList
+          items={books}
+          estimateSize={76}
+          keyExtractor={(b) => b.id}
+          ariaLabel="قائمة الكتب"
+          className="mt-6 flex flex-col gap-3"
+          renderItem={(book) => (
+            <div className="flex items-center gap-3 rounded-xl bg-white p-4 shadow-sm">
               <Link className="min-w-0 flex-1" to={`/categories/${categoryId}/books/${book.id}`}>
-                <span className="block truncate font-medium text-neutral-900">
-                  {book.title}
-                </span>
+                <span className="block truncate font-medium text-neutral-900">{book.title}</span>
                 <span className="mt-0.5 block text-xs text-neutral-500">
                   الصفحة {book.current_page} من {book.total_pages}
                 </span>
               </Link>
               <button
-                className="shrink-0 rounded-lg px-3 py-1.5 text-sm font-medium text-brand-700 transition-colors hover:bg-brand-50"
+                className="shrink-0 rounded-lg px-3 py-1.5 text-sm font-medium text-brand-700 transition-colors hover:bg-brand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600"
                 onClick={() => openEdit(book)}
                 type="button"
               >
                 تعديل
               </button>
               <button
-                className="shrink-0 rounded-lg px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
+                className="shrink-0 rounded-lg px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
                 onClick={() => openDelete(book)}
                 type="button"
               >
                 حذف
               </button>
-            </li>
-          ))}
-        </ul>
+            </div>
+          )}
+        />
       )}
 
       {isFormOpen && (

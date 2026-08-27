@@ -5,6 +5,7 @@ import { ConfirmDeleteDialog } from '../components/confirm-delete-dialog';
 import { EntityDialog } from '../components/entity-dialog';
 import { FormField } from '../components/form-field';
 import { NoteTypeBadge } from '../components/note-editor';
+import { VirtualList } from '../components/virtual-list';
 import { useAuth } from '../lib/auth';
 import {
   countLecturerChildren,
@@ -290,37 +291,37 @@ export default function LecturersScreen(): ReactElement {
           </button>
         </div>
       ) : (
-        <ul className="mt-6 flex flex-col gap-3">
-          {lecturers.map((lecturer) => (
-            <li
-              className="flex items-center gap-3 rounded-xl bg-white p-4 shadow-sm"
-              key={lecturer.id}
-            >
+        <VirtualList
+          items={lecturers}
+          estimateSize={68}
+          keyExtractor={(l) => l.id}
+          ariaLabel="قائمة المدرسين"
+          className="mt-6 flex flex-col gap-3"
+          renderItem={(lecturer) => (
+            <div className="flex items-center gap-3 rounded-xl bg-white p-4 shadow-sm">
               <Link
                 className="min-w-0 flex-1"
                 to={`/categories/${categoryId}/books/${bookId}/lecturers/${lecturer.id}`}
               >
-                <span className="block truncate font-medium text-neutral-900">
-                  {lecturer.name}
-                </span>
+                <span className="block truncate font-medium text-neutral-900">{lecturer.name}</span>
               </Link>
               <button
-                className="shrink-0 rounded-lg px-3 py-1.5 text-sm font-medium text-brand-700 transition-colors hover:bg-brand-50"
+                className="shrink-0 rounded-lg px-3 py-1.5 text-sm font-medium text-brand-700 transition-colors hover:bg-brand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600"
                 onClick={() => openEdit(lecturer)}
                 type="button"
               >
                 تعديل
               </button>
               <button
-                className="shrink-0 rounded-lg px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
+                className="shrink-0 rounded-lg px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
                 onClick={() => openDelete(lecturer)}
                 type="button"
               >
                 حذف
               </button>
-            </li>
-          ))}
-        </ul>
+            </div>
+          )}
+        />
       )}
 
       <section className="mt-10">
@@ -340,21 +341,24 @@ export default function LecturersScreen(): ReactElement {
             لا توجد ملاحظات بعد
           </p>
         ) : (
-          <ul className="mt-4 flex flex-col gap-3">
-            {notes.map((noteItem) => (
-              <li key={noteItem.id}>
-                <Link
-                  className="flex items-center gap-3 rounded-xl bg-white p-4 shadow-sm transition-colors hover:bg-brand-50"
-                  to={`/notes/${noteItem.id}`}
-                >
-                  <span className="min-w-0 flex-1 truncate font-medium text-neutral-900">
-                    {noteItem.title}
-                  </span>
-                  <NoteTypeBadge type={noteItem.type} />
-                </Link>
-              </li>
-            ))}
-          </ul>
+          <VirtualList
+            items={notes}
+            estimateSize={68}
+            keyExtractor={(n) => n.id}
+            ariaLabel="ملاحظات الكتاب"
+            className="mt-4 flex flex-col gap-3"
+            renderItem={(noteItem) => (
+              <Link
+                className="flex items-center gap-3 rounded-xl bg-white p-4 shadow-sm transition-colors hover:bg-brand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600"
+                to={`/notes/${noteItem.id}`}
+              >
+                <span className="min-w-0 flex-1 truncate font-medium text-neutral-900">
+                  {noteItem.title}
+                </span>
+                <NoteTypeBadge type={noteItem.type} />
+              </Link>
+            )}
+          />
         )}
       </section>
 

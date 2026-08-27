@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Allow: /share/
+Disallow: /auth/
+Sitemap: /sitemap.xml

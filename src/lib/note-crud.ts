@@ -1,5 +1,8 @@
 import type { LocalNote, LocalNoteLink, NoteType } from '../types/models';
 import { db } from './db';
+import { coalesceSrsFields, nextReview } from './srs';
+import type { Rating } from './srs';
+import { normalizeArabic } from './arabic-text';
 import { bumpVersion, queueOutbox } from './sync-helpers';
 import { extractTitle, parseWikiLinks } from './note-text';
 import { validateNoteTargets } from './xor-guards';
@@ -47,13 +50,16 @@ function normalizeTarget(value: string | null): string | null {
 
 /**
  * Outbox payload carries the cloud-shaped row: the client-only sync
- * bookkeeping is stripped so M5 can push it verbatim. For deletes the
+ * bookkeeping + GENERATED STORED norm columns are stripped so M5 can push
+ * it verbatim (cloud computes title_norm/content_norm). For deletes the
  * payload is null — `record_id` identifies the row.
  */
 function toNotePayload(record: LocalNote): Record<string, unknown> {
   const cloudRow: Record<string, unknown> = { ...record };
   delete cloudRow.dirty;
   delete cloudRow.server_version;
+  delete cloudRow.title_norm;
+  delete cloudRow.content_norm;
   return cloudRow;
 }
 
@@ -103,16 +109,22 @@ export async function createNote(fields: CreateNoteFields): Promise<string> {
   assertValidTargets({ book_id: bookId, lecture_id: lectureId });
 
   const now = new Date().toISOString();
+  const derivedTitle = extractTitle(fields.content);
   const record: LocalNote = {
     id: crypto.randomUUID(),
     user_id: fields.user_id,
     book_id: bookId,
     lecture_id: lectureId,
-    title: extractTitle(fields.content),
+    title: derivedTitle,
     content: fields.content,
     type: fields.type,
     review_date: todayIsoDate(),
+    ease_factor: 2.5,
+    interval_days: 0,
+    repetitions: 0,
     is_public: false,
+    title_norm: normalizeArabic(derivedTitle),
+    content_norm: normalizeArabic(fields.content),
     created_at: now,
     updated_at: now,
     version: INITIAL_VERSION,
@@ -141,6 +153,8 @@ export async function updateNote(current: LocalNote, changes: NoteChanges): Prom
     updated_at: new Date().toISOString(),
   });
   next.title = extractTitle(next.content);
+  next.title_norm = normalizeArabic(next.title);
+  next.content_norm = normalizeArabic(next.content);
 
   await db.transaction('rw', db.notes, db.note_links, db.outbox, async () => {
     await db.notes.put(next);
@@ -150,6 +164,38 @@ export async function updateNote(current: LocalNote, changes: NoteChanges): Prom
       op: 'update',
       record_id: next.id,
       payload: toNotePayload(next),
+    });
+  });
+}
+
+/**
+ * Apply one SRS rating to a note (card-mode step).
+ * Computes the next SM-2 fields, bumps version, and queues a push — all in
+ * ONE Dexie transaction. The caller must not show the next card before this
+ * resolves (AGENTS.md card mode).
+ */
+export async function rateNote(current: LocalNote, rating: Rating): Promise<void> {
+  const today = todayIsoDate();
+  const srs = coalesceSrsFields(current);
+  const next = nextReview(srs, rating, today);
+  const updated: LocalNote = bumpVersion({
+    ...current,
+    ease_factor: next.ease_factor,
+    interval_days: next.interval_days,
+    repetitions: next.repetitions,
+    review_date: next.review_date,
+    title_norm: current.title_norm,
+    content_norm: current.content_norm,
+    updated_at: new Date().toISOString(),
+  });
+
+  await db.transaction('rw', db.notes, db.outbox, async () => {
+    await db.notes.put(updated);
+    await queueOutbox({
+      table_name: 'notes',
+      op: 'update',
+      record_id: updated.id,
+      payload: toNotePayload(updated),
     });
   });
 }

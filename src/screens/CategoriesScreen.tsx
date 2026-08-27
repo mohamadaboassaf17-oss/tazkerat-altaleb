@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { ConfirmDeleteDialog } from '../components/confirm-delete-dialog';
 import { EntityDialog } from '../components/entity-dialog';
 import { FormField } from '../components/form-field';
+import { VirtualList } from '../components/virtual-list';
 import { useAuth } from '../lib/auth';
 import {
   countCategoryChildren,
@@ -13,6 +14,7 @@ import {
 } from '../lib/entity-crud';
 import { validateRequiredText } from '../lib/entity-validation';
 import { db } from '../lib/db';
+import { downloadTextFile, exportCategoryMarkdown, sanitizeFilename } from '../lib/export';
 import type { LocalCategory } from '../types/models';
 
 const LOAD_ERROR = 'تعذّر تحميل التصنيفات المحلية.';
@@ -196,12 +198,14 @@ export default function CategoriesScreen(): ReactElement {
           </button>
         </div>
       ) : (
-        <ul className="mt-6 flex flex-col gap-3">
-          {categories.map((category) => (
-            <li
-              className="flex items-center gap-3 rounded-xl bg-white p-4 shadow-sm"
-              key={category.id}
-            >
+        <VirtualList
+          items={categories}
+          estimateSize={72}
+          keyExtractor={(c) => c.id}
+          ariaLabel="قائمة التصنيفات"
+          className="mt-6 flex flex-col gap-3"
+          renderItem={(category) => (
+            <div className="flex items-center gap-3 rounded-xl bg-white p-4 shadow-sm">
               <Link className="min-w-0 flex-1" to={`/categories/${category.id}`}>
                 <span className="block truncate font-medium text-neutral-900">
                   {category.icon !== null && category.icon.length > 0 && (
@@ -213,22 +217,34 @@ export default function CategoriesScreen(): ReactElement {
                 </span>
               </Link>
               <button
-                className="shrink-0 rounded-lg px-3 py-1.5 text-sm font-medium text-brand-700 transition-colors hover:bg-brand-50"
+                className="shrink-0 rounded-lg px-3 py-1.5 text-sm font-medium text-brand-700 transition-colors hover:bg-brand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600"
                 onClick={() => openEdit(category)}
                 type="button"
               >
                 تعديل
               </button>
               <button
-                className="shrink-0 rounded-lg px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
+                className="shrink-0 rounded-lg px-3 py-1.5 text-sm font-medium text-neutral-600 transition-colors hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600"
+                onClick={() => {
+                  void exportCategoryMarkdown(category.id).then((md) => {
+                    if (md.trim().length === 0) return;
+                    downloadTextFile(`${sanitizeFilename(category.name)}.md`, md);
+                  });
+                }}
+                type="button"
+              >
+                تصدير
+              </button>
+              <button
+                className="shrink-0 rounded-lg px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
                 onClick={() => openDelete(category)}
                 type="button"
               >
                 حذف
               </button>
-            </li>
-          ))}
-        </ul>
+            </div>
+          )}
+        />
       )}
 
       {isFormOpen && (
